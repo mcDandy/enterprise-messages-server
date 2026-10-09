@@ -1,32 +1,44 @@
+
 package cz.upce.fei.ems.backend.domain;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SourceType;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-import java.util.Collection;
-
-@Setter
-@Getter
-@ToString
-@EqualsAndHashCode
-@NoArgsConstructor
 @Entity
 @Table(name = "app_user")
-//todo example only
-public class AppUser implements UserDetails
-{
+@Getter
+@Setter
+@NoArgsConstructor
+public class AppUser implements UserDetails {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false)
     private Long id;
+
+    @Column(name = "username", nullable = false, length = 100)
     private String username;
+
+    @Column(name = "password_hash", nullable = false, length = 255)
     private String hashedPassword;
-    private String publicKey;
+
+    @Column(name = "display_name", length = 100)
+    private String displayName;
+
+    @CreationTimestamp(source = SourceType.DB)
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
