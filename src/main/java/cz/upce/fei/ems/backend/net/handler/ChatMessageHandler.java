@@ -9,23 +9,26 @@ import org.springframework.web.socket.WebSocketSession;
 
 @Component
 @RequiredArgsConstructor
-public class KeyRotationHandler implements PacketHandler {
+public class ChatMessageHandler implements PacketHandler {
 
     private final PacketDispatcher dispatcher;
 
     @Override
     public PacketType getSupportedType() {
-        return PacketType.KEY_ROTATION;
+        return PacketType.CHAT_MESSAGE;
     }
 
     @Override
     public void handle(WebSocketSession session, Packet packet) throws Exception {
         String senderUsername = (String) session.getAttributes().get("username");
         if (senderUsername == null) {
-            dispatcher.sendError(session, "Neautorizovaný požadavek.");
+            dispatcher.sendError(session, "Neautorizované spojení.");
             return;
         }
 
-        System.out.println("Přijat požadavek na rotaci klíče od: " + senderUsername);
+        // Zde v budoucnu uložíš šifrovaný payload do DB (přes MessageRepository)
+        // A rovnou rozpošleš zprávu příjemcům:
+        // dispatcher.broadcastToChannel(channelId, packet);
+        System.out.println("Přijata zpráva od " + senderUsername + " o délce " + packet.getPayload().length + " B");
     }
 }

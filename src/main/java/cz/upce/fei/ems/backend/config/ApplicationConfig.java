@@ -19,8 +19,8 @@ public class ApplicationConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         return username ->
-                (org.springframework.security.core.userdetails.UserDetails) userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+                userRepository.findByUsername(username).orElseThrow(()
+                        -> new UsernameNotFoundException("User not found"));
     }
 
     @Bean

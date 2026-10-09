@@ -44,6 +44,7 @@ public enum PacketType {
     // --- Kryptografie (0x0400 - 0x04FF) ---
     KEY_EXCHANGE_REQ((short) 0x0400),
     KEY_EXCHANGE_RESP((short) 0x0401),
+    KEY_ROTATION((short) 0x0402),
 
     UNKNOWN((short) 0x0000);
 

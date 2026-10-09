@@ -9,23 +9,18 @@ import org.springframework.web.socket.WebSocketSession;
 
 @Component
 @RequiredArgsConstructor
-public class KeyRotationHandler implements PacketHandler {
+public class PingPongHandler implements PacketHandler {
 
     private final PacketDispatcher dispatcher;
 
     @Override
     public PacketType getSupportedType() {
-        return PacketType.KEY_ROTATION;
+        return PacketType.PING;
     }
 
     @Override
     public void handle(WebSocketSession session, Packet packet) throws Exception {
-        String senderUsername = (String) session.getAttributes().get("username");
-        if (senderUsername == null) {
-            dispatcher.sendError(session, "Neautorizovaný požadavek.");
-            return;
-        }
-
-        System.out.println("Přijat požadavek na rotaci klíče od: " + senderUsername);
+        Packet pong = new Packet(PacketType.PONG.getCode(), new byte[0]);
+        dispatcher.sendTo(session, pong);
     }
 }

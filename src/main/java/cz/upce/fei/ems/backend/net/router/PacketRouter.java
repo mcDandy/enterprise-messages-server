@@ -22,7 +22,9 @@ public class PacketRouter {
     }
 
     public void route(WebSocketSession session, Packet packet) throws Exception {
-        PacketHandler handler = handlers.get(packet.getType());
+        PacketType typeEnum = PacketType.fromCode(packet.getType());
+        PacketHandler handler = handlers.get(typeEnum);
+
         if (handler != null) {
             handler.handle(session, packet);
         } else {
