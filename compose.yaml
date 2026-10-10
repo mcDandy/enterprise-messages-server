@@ -36,6 +36,20 @@ services:
       DB_USERNAME: nnpro
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     ports:
+          - "8082:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend2:
+    build: .
+    image: nnpro-backend:dev
+    container_name: ems-server
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/nnpro
+      DB_USERNAME: nnpro
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    ports:
       - "8080:8080"
     depends_on:
       db:
