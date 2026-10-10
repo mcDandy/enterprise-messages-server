@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: nnpro
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
@@ -22,26 +22,12 @@ services:
     image: adminer:latest
     container_name: ems-adminer
     ports:
-      - "8081:8080"
+      - "127.0.0.1:8081:8080"
     depends_on:
       db:
         condition: service_healthy
 
   backend:
-    build: .
-    image: nnpro-backend:dev
-    container_name: ems-backend
-    environment:
-      DB_URL: jdbc:postgresql://db:5432/nnpro
-      DB_USERNAME: nnpro
-      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-    ports:
-          - "8082:8080"
-    depends_on:
-      db:
-        condition: service_healthy
-
-  backend2:
     build: .
     image: nnpro-backend:dev
     container_name: ems-server
