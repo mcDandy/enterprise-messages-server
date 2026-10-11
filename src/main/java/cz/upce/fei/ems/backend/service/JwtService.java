@@ -1,39 +1,62 @@
 package cz.upce.fei.ems.backend.service;
 
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Service
 public class JwtService {
-    // todo do dotenvu
-    private static final String SECRET_KEY = "nějáký-Docela-dlouhý-klutz+*Kteryj7Saguestovatblbě6bude";
-    private static final long EXPIRATION = 86400000; // todo do dotenvu a stnížit
+
+    @Value("${JWT_SECRET:nějáký-Docela-dlouhý-klutz+*Kteryj7Saguestovatblbě6bude}")
+    private String secretKey;
+
+    @Value("${JWT_EXPIRATION:86400000}")
+    private long expiration;
+
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+    }
 
     public String generateToken(String username) {
         return Jwts.builder()
                 .subject(username)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + EXPIRATION))
-                .signWith(Keys.hmacShaKeyFor(SECRET_KEY.getBytes()))
+                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey())
                 .compact();
     }
 
     public String extractUsername(String token) {
         return Jwts.parser()
-                .verifyWith(Keys.hmacShaKeyFor(SECRET_KEY.getBytes()))
+                .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
     }
 
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token);
+            return !isTokenExpired(token);
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        return (username.equals(userDetails.getUsername())) && validateToken(token);
     }
 
     private boolean isTokenExpired(String token) {
@@ -42,7 +65,7 @@ public class JwtService {
 
     private Date extractExpiration(String token) {
         return Jwts.parser()
-                .verifyWith(Keys.hmacShaKeyFor(SECRET_KEY.getBytes()))
+                .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload()
