@@ -7,5 +7,6 @@ import java.util.Optional;
 
 public interface UserKeyRepository extends JpaRepository<UserKey, Long> {
     Optional<UserKey> findByUserIdAndRevokedAtIsNull(Long userId);
+    Optional<UserKey> findByUserIdInAndRevokedAtIsNull(List<Long> userId);
     List<UserKey> findByUserIdOrderByCreatedAtDesc(Long userId);
 }

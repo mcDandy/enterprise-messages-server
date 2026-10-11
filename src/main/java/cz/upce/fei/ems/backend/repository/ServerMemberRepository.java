@@ -4,9 +4,11 @@ import cz.upce.fei.ems.backend.domain.ServerMember;
 import cz.upce.fei.ems.backend.domain.ServerMemberId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
+import java.util.Optional;
 
 public interface ServerMemberRepository extends JpaRepository<ServerMember, ServerMemberId> {
     List<ServerMember> findByUserId(Long userId);
     List<ServerMember> findByServerId(Long serverId);
     boolean existsByServerIdAndUserId(Long serverId, Long userId);
+    Optional<ServerMember> findByServerIdAndUserId(Long serverId, Long userId);
 }

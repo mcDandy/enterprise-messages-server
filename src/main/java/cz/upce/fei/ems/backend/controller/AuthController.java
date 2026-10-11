@@ -27,8 +27,14 @@ public class AuthController {
             summary = "User Registration",
             description = "Registers a new user and stores their public E2EE key.",
             responses = {
-                    @ApiResponse(responseCode = "201", description = "Registration successful", content = @Content(schema = @Schema(implementation = AuthResponseDto.class))),
-                    @ApiResponse(responseCode = "400", description = "Invalid request or weak password", content = @Content),
+                    @ApiResponse(
+                            responseCode = "201",
+                            description = "Registration successful",
+                            content = @Content(schema = @Schema(implementation = AuthResponseDto.class))),
+                    @ApiResponse(
+                            responseCode = "400",
+                            description = "Invalid request or weak password",
+                            content = @Content),
                     @ApiResponse(responseCode = "409", description = "Username already taken", content = @Content)
             }
     )
@@ -41,7 +47,10 @@ public class AuthController {
             summary = "User Login",
             description = "Returns JWT token.",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Login successful.", content = @Content(schema = @Schema(implementation = AuthResponseDto.class))),
+                    @ApiResponse(
+                            responseCode = "200", description = "Login successful.",
+                            content = @Content(schema = @Schema(implementation = AuthResponseDto.class))
+                    ),
                     @ApiResponse(responseCode = "401", description = "Invalid username or password", content = @Content)
             }
     )
