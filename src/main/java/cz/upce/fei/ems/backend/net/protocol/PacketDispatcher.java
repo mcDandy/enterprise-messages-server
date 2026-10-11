@@ -32,7 +32,6 @@ public class PacketDispatcher {
         byte[] payload = errorMessage.getBytes(StandardCharsets.UTF_8);
         Packet errorPacket = new Packet(
                 PacketType.UNKNOWN.getCode(),
-                Packet.FLAG_NONE, System.currentTimeMillis(),
                 payload
         );
         sendTo(session, errorPacket);

@@ -1,24 +1,13 @@
 package cz.upce.fei.ems.backend.net.protocol;
 
 import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Packet {
-    public static final byte FLAG_NONE = 0x00;
-    public static final byte FLAG_ENCRYPTED = 0x01;
-
-    private short type;
-    private byte flags;
-    private long timestamp;
+    private byte type;
     private byte[] payload;
-
-    public Packet(short type, byte[] payload) {
-        this(type, FLAG_NONE, System.currentTimeMillis(), payload);
-    }
 }
