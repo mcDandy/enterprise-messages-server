@@ -40,6 +40,9 @@ public class AppUser implements UserDetails {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "fcm_token")
+    private String fcmToken;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("user"));
