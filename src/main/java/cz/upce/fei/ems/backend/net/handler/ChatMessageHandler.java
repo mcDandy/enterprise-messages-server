@@ -35,6 +35,11 @@ public class ChatMessageHandler implements PacketHandler {
         }
 
         Long channelKeyId = (Long) session.getAttributes().get("currentChannelKeyId");
+        if (channelKeyId == null) {
+            dispatcher.sendError(session, "Channel has no active key.");
+            return;
+        }
+
         byte[] payload = packet.getPayload();
 
         try {

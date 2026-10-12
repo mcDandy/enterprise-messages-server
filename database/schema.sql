@@ -12,7 +12,8 @@ CREATE TABLE app_user
 	username varchar(100) NOT NULL,
 	password_hash varchar(255) NOT NULL,
 	display_name varchar(100) NULL,
-	created_at timestamp with time zone NOT NULL   DEFAULT CURRENT_TIMESTAMP
+	created_at timestamp with time zone NOT NULL   DEFAULT CURRENT_TIMESTAMP,
+	fcm_token varchar(255) NULL
 )
 ;
 

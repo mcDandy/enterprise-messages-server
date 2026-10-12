@@ -48,7 +48,7 @@ public class MessageService {
 
             if (recipient != null && !recipient.getUsername().equals(senderUsername)) {
                 notificationService.sendNewMessageNotification(
-                        recipient.getFcmToken(), "Channel #" + channelId
+                        recipient.getFcmToken(), channelId, "Channel #" + channelId
                 );
             }
         }

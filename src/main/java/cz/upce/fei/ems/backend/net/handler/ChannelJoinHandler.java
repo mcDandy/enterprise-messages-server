@@ -4,7 +4,9 @@ import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
+import cz.upce.fei.ems.backend.net.session.SessionRegistry;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
+import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -19,6 +21,8 @@ public class ChannelJoinHandler implements PacketHandler {
     private final PacketDispatcher dispatcher;
     private final ChannelMemberRepository channelMemberRepository;
     private final AppUserRepository appUserRepository;
+    private final ChannelKeyRepository channelKeyRepository;
+    private final SessionRegistry sessionRegistry;
 
     @Override
     public PacketType getSupportedType() {
@@ -56,9 +60,23 @@ public class ChannelJoinHandler implements PacketHandler {
             return;
         }
 
+        if (channelKeyId == null) {
+            channelKeyId = channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId)
+                    .map(key -> key.getId())
+                    .orElse(null);
+        }
+
+        Long previousChannelId = (Long) session.getAttributes().get("currentChannelId");
+        if (previousChannelId != null && !previousChannelId.equals(channelId)) {
+            sessionRegistry.leaveChannel(previousChannelId, username);
+        }
+        sessionRegistry.joinChannel(channelId, username);
+
         session.getAttributes().put("currentChannelId", channelId);
         if (channelKeyId != null) {
             session.getAttributes().put("currentChannelKeyId", channelKeyId);
+        } else {
+            session.getAttributes().remove("currentChannelKeyId");
         }
 
     }

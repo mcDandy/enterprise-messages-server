@@ -2,7 +2,7 @@ package cz.upce.fei.ems.backend.net.handler;
 
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
-import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
+import cz.upce.fei.ems.backend.net.router.PacketRouter;
 import cz.upce.fei.ems.backend.net.session.SessionRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ import org.springframework.web.socket.handler.BinaryWebSocketHandler;
 public class PacketWebSocketHandler extends BinaryWebSocketHandler {
 
     private final PacketCodec packetCodec;
-    private final PacketDispatcher packetDispatcher;
+    private final PacketRouter packetRouter;
     private final SessionRegistry sessionRegistry;
 
     @Override
@@ -33,7 +33,7 @@ public class PacketWebSocketHandler extends BinaryWebSocketHandler {
     protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) throws Exception {
         Packet packet = packetCodec.decode(message.getPayload());
 
-        packetDispatcher.sendTo(session, packet);
+        packetRouter.route(session, packet);
     }
 
     @Override
