@@ -1,9 +1,7 @@
 package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.AppUser;
-import cz.upce.fei.ems.backend.domain.ServerMember;
-import cz.upce.fei.ems.backend.domain.ServerRole;
-import cz.upce.fei.ems.backend.net.session.SessionRegistry; // Import registru
+import cz.upce.fei.ems.backend.net.session.SessionRegistry;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import lombok.RequiredArgsConstructor;

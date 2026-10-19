@@ -35,8 +35,19 @@ services:
       DB_URL: jdbc:postgresql://db:5432/nnpro
       DB_USERNAME: nnpro
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      SERVER_PORT: 8443
+      SERVER_SSL_ENABLED: true
+      SERVER_SSL_KEY_STORE: file:/certs/keystore.p12
+      SERVER_SSL_KEY_STORE_PASSWORD: secret123
+      SERVER_SSL_KEY_STORE_TYPE: PKCS12
+      SERVER_SSL_KEY_ALIAS: ems-backend
+      GOOGLE_APPLICATION_CREDENTIALS: /app/firebase-service-account.json
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    volumes:
+      - .:/app
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
     ports:
-      - "8080:8080"
+      - "8443:8443"
     depends_on:
       db:
         condition: service_healthy
