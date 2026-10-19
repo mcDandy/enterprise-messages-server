@@ -1,5 +1,7 @@
 package cz.upce.fei.ems.backend.config;
 
+import cz.upce.fei.ems.backend.domain.AppUser;
+import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -23,6 +25,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final AppUserRepository appUserRepository;
 
     @Override
     protected void doFilterInternal(
@@ -43,9 +46,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         jwt = authHeader.substring(7); // protože "Bearer "
         username = jwtService.extractUsername(jwt);
 
-
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+            AppUser appUser = appUserRepository.findByUsername(username).orElse(null);
+            if (appUser != null && appUser.isBanned()) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Your account has been globally banned.");
+                return;
+            }
+
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+
             if (jwtService.isTokenValid(jwt, userDetails)) {
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails,

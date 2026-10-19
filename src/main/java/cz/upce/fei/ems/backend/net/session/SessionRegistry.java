@@ -61,4 +61,17 @@ public class SessionRegistry {
         }
         return sessions;
     }
+
+    public void removeAndCloseSession(String username) {
+        WebSocketSession session = activeSessions.remove(username);
+        if (session != null) {
+            try {
+                if (session.isOpen()) {
+                    session.close();
+                }
+            } catch (Exception e) {
+            }
+        }
+        channelMembers.values().forEach(members -> members.remove(username));
+    }
 }

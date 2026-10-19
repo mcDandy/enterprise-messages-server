@@ -27,7 +27,7 @@ public class ServerMembershipController {
     @Operation(summary = "List server members")
     @GetMapping
     public ResponseEntity<List<ServerMember>> getMembers(@PathVariable Long serverId) {
-        return ResponseEntity.ok(serverMemberRepository.findByUserId(serverId));
+        return ResponseEntity.ok(serverMemberRepository.findByServerId(serverId));
     }
 
     @Operation(summary = "Add member to server (Admin only)")
