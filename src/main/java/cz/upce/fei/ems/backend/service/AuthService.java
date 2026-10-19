@@ -56,6 +56,10 @@ public class AuthService {
                         HttpStatus.UNAUTHORIZED, "Uživatel neexistuje"
                 ));
 
+        if (user.isBanned()) {
+            throw new SecurityException("Access denied: Your account has been banned.");
+        }
+
         if (!passwordEncoder.matches(
                 request.getPassword(), user.getHashedPassword())) {
             throw new ResponseStatusException(

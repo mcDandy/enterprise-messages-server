@@ -43,6 +43,12 @@ public class AppUser implements UserDetails {
     @Column(name = "fcm_token")
     private String fcmToken;
 
+    @Column(name = "is_banned", nullable = false)
+    private boolean isBanned = false;
+
+    @Column(name = "isMainAdmin", nullable = false)
+    private boolean isMainAdmin = false;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("user"));
