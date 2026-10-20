@@ -1,18 +1,13 @@
-FROM eclipse-temurin:21-jdk
-
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
+COPY gradlew build.gradle settings.gradle ./
+COPY gradle ./gradle
+COPY src ./src
+RUN chmod +x gradlew
+RUN ./gradlew bootJar --no-daemon -x test
 
-# Vygenerování SSL certifikátu do bezpečné složky mimo /app
-RUN mkdir -p /certs && \
-    keytool -genkeypair -alias ems-backend \
-    -keyalg RSA -keysize 2048 \
-    -storetype PKCS12 \
-    -keystore /certs/keystore.p12 \
-    -validity 3650 \
-    -storepass secret123 \
-    -dname "CN=localhost, OU=EMS, O=UPCE, L=Pardubice, C=CZ"
-
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /app/build/libs/*.jar app.jar
 EXPOSE 8443
-
-# Spuštění přes Gradle bootRun (reaguje na změny v souborech)
-CMD ["./gradlew", "bootRun", "--no-daemon"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

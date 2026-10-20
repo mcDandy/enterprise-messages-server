@@ -24,6 +24,24 @@ class UserRepositoryIntegrationTest {
     private EntityManager entityManager;
 
     @Test
+    void shouldStoreBannedAndAdminFlagsWithNullableFcmToken() {
+        AppUser user = new AppUser();
+        user.setUsername("flags_test_" + UUID.randomUUID());
+        user.setHashedPassword("test_hash_only");
+        user.setBanned(true);
+        user.setMainAdmin(true);
+        // Firebase token is optional, for example at first registration.
+        user.setFcmToken(null);
+        Long id = userRepository.saveAndFlush(user).getId();
+
+        entityManager.clear();
+        AppUser loaded = userRepository.findById(id).orElseThrow();
+        assertTrue(loaded.isBanned());
+        assertTrue(loaded.isMainAdmin());
+        assertNull(loaded.getFcmToken());
+    }
+
+    @Test
     void shouldSaveAndLoadUser() {
         String username = "jpa_test_" + UUID.randomUUID();
 

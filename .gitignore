@@ -43,3 +43,9 @@ backup
 *.zip
 
 .env
+
+# Local infrastructure secrets (never commit private keys or Firebase credentials)
+certs/
+*.p12
+*.jks
+firebase-service-account.json

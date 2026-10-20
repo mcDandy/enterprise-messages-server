@@ -1,0 +1,13 @@
+# Optional local Firebase credentials. Use only if you actually have this file.
+# docker compose -f compose.yaml -f compose.firebase.yaml up -d --build
+services:
+  backend:
+    environment:
+      FIREBASE_CONFIG_PATH: /run/secrets/firebase-service-account.json
+    volumes:
+      - type: bind
+        source: ./firebase-service-account.json
+        target: /run/secrets/firebase-service-account.json
+        read_only: true
+        bind:
+          create_host_path: false

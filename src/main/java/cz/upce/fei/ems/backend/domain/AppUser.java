@@ -1,4 +1,3 @@
-
 package cz.upce.fei.ems.backend.domain;
 
 import jakarta.persistence.*;
@@ -46,7 +45,7 @@ public class AppUser implements UserDetails {
     @Column(name = "is_banned", nullable = false)
     private boolean isBanned = false;
 
-    @Column(name = "isMainAdmin", nullable = false)
+    @Column(name = "is_main_admin", nullable = false)
     private boolean isMainAdmin = false;
 
     @Override
