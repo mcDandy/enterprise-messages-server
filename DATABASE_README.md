@@ -7,27 +7,54 @@ For local development, compose.dev.yaml provides an alternative
 Gradle bootRun mode without rebuilding the Docker image after
 ordinary Java source changes.
 
-## Initial setup (Windows PowerShell)
+## Initial setup
 
 1. Copy `.env.example` to `.env`. Set `DB_PASSWORD`, a random `JWT_SECRET`
    (32+ bytes), and `TLS_KEYSTORE_PASSWORD` (choose your own secrets, do not commit them).
-2. Generate a local development certificate **before starting Compose**:
+
+2. Generate a local development certificate **before starting Compose**.
+   Java JDK (`keytool`) is required.
+
+   **Windows (PowerShell):**
 
    ```powershell
    .\scripts\create-dev-certificate.ps1
    ```
 
-   To connect from a real phone, generate it with the PC's stable LAN IP in the SAN:
+   With a LAN IP for connecting from an Android device:
 
    ```powershell
    .\scripts\create-dev-certificate.ps1 -LanIp 192.168.1.115
    ```
 
-   Replace the sample IP with your own. The script refuses to overwrite an existing
-   keystore. The password prompted by `keytool` must match `TLS_KEYSTORE_PASSWORD`
-   in `.env`. Certificates/private keys (`certs/`) are ignored by Git. The
-   script also exports `certs/dev-server.crt` (public certificate only), which
-   the Android developer can add to debug-only trust configuration.
+   **Linux / macOS (Bash):**
+
+   ```bash
+   ./scripts/create-dev-certificate.sh
+   ```
+
+   With a LAN IP:
+
+   ```bash
+   ./scripts/create-dev-certificate.sh 192.168.1.115
+   ```
+
+   Replace the sample IP with your computer's LAN IP.
+
+   Both scripts generate `certs/keystore.p12` and export
+   `certs/dev-server.crt`. Neither overwrites an existing keystore.
+
+   Enter a password when prompted by `keytool` and set the same
+   value as `TLS_KEYSTORE_PASSWORD` in `.env`.
+
+   Certificates and private keys in `certs/` are ignored by Git.
+   The exported `.crt` contains only the public certificate and
+   can be used by the Android developer for debug-only trust.
+
+   Self-signed certificates are not trusted automatically.
+   Android clients must explicitly trust the certificate and
+   connect using a hostname or IP included in its SAN.
+
 
 3. Start the services:
 
