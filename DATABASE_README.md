@@ -122,6 +122,27 @@ after backup, e.g.:
 Get-Content .\database\migrations\001_sync_app_user.sql -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U nnpro -d nnpro
 ```
 
+### Migration 002: Channel tables and message receipts
+
+Existing databases must also run
+`database/migrations/002_update_message_schema.sql`
+after migration 001.
+
+Stop the backend and back up the database before migrating.
+
+```powershell
+Get-Content -Raw .\database\migrations\002_update_message_schema.sql |
+    docker compose exec -T db psql -v ON_ERROR_STOP=1 -U nnpro -d nnpro
+```
+
+This migration renames the channel tables and changes message receipts
+to store the last delivered and read message per user and channel.
+
+Original per-message receipts are preserved in `message_receipt_legacy`.
+
+Migrations are intended to run only once. Do not run either migration
+on a fresh database initialized from the `database/schema.sql`.
+
 Do **not** use `docker compose down -v` on a database containing data you want.
 Hibernate is set to `ddl-auto=validate` and does not silently rewrite the schema.
 
@@ -221,7 +242,7 @@ docker compose -p nnpro-tests --profile test run --rm --build tests
 docker compose -p nnpro-tests --profile test down
 ```
 
-The `tests` service runs the existing JUnit `@DataJpaTest` scenarios against
+The `tests` service runs JUnit integration tests against
 `jdbc:postgresql://db-test:5432/nnpro_test`. The build image includes JDK 21,
 Gradle and test sources; the runtime backend image only contains the JRE and JAR.
 

@@ -9,7 +9,7 @@ import org.hibernate.annotations.SourceType;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "channel_key")
+@Table(name = "message_channel_key")
 @Getter
 @Setter
 @NoArgsConstructor

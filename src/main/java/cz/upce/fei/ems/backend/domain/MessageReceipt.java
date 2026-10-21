@@ -4,9 +4,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.SourceType;
-import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "message_receipt")
@@ -15,17 +12,18 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor
 @IdClass(MessageReceiptId.class)
 public class MessageReceipt {
+
     @Id
-    @Column(name = "message_id", nullable = false)
-    private Long messageId;
+    @Column(name = "message_channel_id", nullable = false)
+    private Long messageChannelId;
 
     @Id
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "delivered_at")
-    private OffsetDateTime deliveredAt;
+    @Column(name = "last_delivered_message_id")
+    private Long lastDeliveredMessageId;
 
-    @Column(name = "read_at")
-    private OffsetDateTime readAt;
+    @Column(name = "last_read_message_id")
+    private Long lastReadMessageId;
 }

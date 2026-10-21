@@ -26,7 +26,7 @@ if [[ -e "$keystore" ]]; then
   exit 1
 fi
 
-san="SAN=DNS:localhost,IP:127.0.0.1"
+san="SAN=DNS:localhost,IP:127.0.0.1,IP:10.0.2.2,IP:172.18.0.1"
 if [[ -n "${1:-}" ]]; then
   san+=",IP:$1"
 fi

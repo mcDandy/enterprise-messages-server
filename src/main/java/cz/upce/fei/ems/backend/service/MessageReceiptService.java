@@ -1,15 +1,14 @@
 package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.AppUser;
-import cz.upce.fei.ems.backend.domain.MessageReceipt;
-import cz.upce.fei.ems.backend.domain.MessageReceiptId;
+import cz.upce.fei.ems.backend.domain.Message;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
+import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.MessageReceiptRepository;
+import cz.upce.fei.ems.backend.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.OffsetDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -17,47 +16,58 @@ public class MessageReceiptService {
 
     private final MessageReceiptRepository messageReceiptRepository;
     private final AppUserRepository appUserRepository;
+    private final MessageRepository messageRepository;
+    private final ChannelMemberRepository channelMemberRepository;
 
     @Transactional
-    public void markAsDelivered(Long messageId, String username) {
-        AppUser user = appUserRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + username));
+    public Long markAsDelivered(Long messageId, String username) {
+        ReceiptContext context = validateReceipt(messageId, username);
 
-        MessageReceiptId receiptId = new MessageReceiptId(messageId, user.getId());
-        MessageReceipt receipt = messageReceiptRepository.findById(receiptId)
-                .orElseGet(() -> {
-                    MessageReceipt newReceipt = new MessageReceipt();
-                    newReceipt.setMessageId(messageId);
-                    newReceipt.setUserId(user.getId());
-                    return newReceipt;
-                });
+        messageReceiptRepository.upsertDelivered(
+                context.channelId(),
+                context.userId(),
+                messageId
+        );
 
-        if (receipt.getDeliveredAt() == null) {
-            receipt.setDeliveredAt(OffsetDateTime.now());
-            messageReceiptRepository.save(receipt);
-        }
+        return context.channelId();
     }
 
     @Transactional
-    public void markAsRead(Long messageId, String username) {
+    public Long markAsRead(Long messageId, String username) {
+        ReceiptContext context = validateReceipt(messageId, username);
+
+        messageReceiptRepository.upsertRead(
+                context.channelId(),
+                context.userId(),
+                messageId
+        );
+
+        return context.channelId();
+    }
+
+    private ReceiptContext validateReceipt(Long messageId, String username) {
         AppUser user = appUserRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + username));
+                .orElseThrow(() ->
+                        new IllegalStateException("User not found: " + username)
+                );
 
-        MessageReceiptId receiptId = new MessageReceiptId(messageId, user.getId());
-        MessageReceipt receipt = messageReceiptRepository.findById(receiptId)
-                .orElseGet(() -> {
-                    MessageReceipt newReceipt = new MessageReceipt();
-                    newReceipt.setMessageId(messageId);
-                    newReceipt.setUserId(user.getId());
-                    return newReceipt;
-                });
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Message not found: " + messageId)
+                );
 
-        if (receipt.getDeliveredAt() == null) {
-            receipt.setDeliveredAt(OffsetDateTime.now());
+        Long channelId = message.getChannelId();
+
+        boolean isMember = channelMemberRepository
+                .existsByChannelIdAndUserId(channelId, user.getId());
+
+        if (!isMember) {
+            throw new SecurityException("User is not a member of this channel.");
         }
-        if (receipt.getReadAt() == null) {
-            receipt.setReadAt(OffsetDateTime.now());
-            messageReceiptRepository.save(receipt);
-        }
+
+        return new ReceiptContext(channelId, user.getId());
+    }
+
+    private record ReceiptContext(Long channelId, Long userId) {
     }
 }
