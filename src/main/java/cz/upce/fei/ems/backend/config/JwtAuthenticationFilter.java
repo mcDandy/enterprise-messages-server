@@ -42,6 +42,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
+        if (authHeader.length() < 8) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Token is too short.");
+            return;
+        }
 
         jwt = authHeader.substring(7); // protože "Bearer "
         username = jwtService.extractUsername(jwt);
