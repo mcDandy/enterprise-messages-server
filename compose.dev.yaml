@@ -1,0 +1,20 @@
+
+services:
+  backend:
+    build:
+      target: build
+
+    environment:
+      GRADLE_USER_HOME: /gradle-home
+      DB_URL: jdbc:postgresql://db:5432/nnpro
+
+    command: ["./gradlew", "bootRun", "--no-daemon"]
+
+    volumes:
+      - ./src:/app/src:ro
+      - ./build.gradle:/app/build.gradle:ro
+      - ./settings.gradle:/app/settings.gradle:ro
+      - dev_gradle_home:/gradle-home
+
+volumes:
+  dev_gradle_home:

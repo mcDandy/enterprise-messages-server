@@ -41,19 +41,18 @@ public class MessageReceiptHandler implements PacketHandler {
         byte actionType = buffer.get(); // 1 = DELIVERED, 2 = READ
 
         try {
+            Long channelId;
+
             if (actionType == 1) {
-                messageReceiptService.markAsDelivered(messageId, username);
+                channelId = messageReceiptService.markAsDelivered(messageId, username);
             } else if (actionType == 2) {
-                messageReceiptService.markAsRead(messageId, username);
+                channelId = messageReceiptService.markAsRead(messageId, username);
             } else {
                 dispatcher.sendError(session, "Unknown receipt action type.");
                 return;
             }
 
-            Long channelId = (Long) session.getAttributes().get("currentChannelId");
-            if (channelId != null) {
-                dispatcher.broadcastToChannel(channelId, packet);
-            }
+            dispatcher.broadcastToChannel(channelId, packet);
 
         } catch (Exception e) {
             dispatcher.sendError(session, "Failed to process receipt: " + e.getMessage());
