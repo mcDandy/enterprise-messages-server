@@ -1,8 +1,8 @@
 package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.AppUser;
-import cz.upce.fei.ems.backend.domain.ServerMember;
-import cz.upce.fei.ems.backend.domain.ServerRole;
+import cz.upce.fei.ems.backend.domain.MessageServerMember;
+import cz.upce.fei.ems.backend.domain.MessageServerRole;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ public class ServerMembershipService {
     private final ServerService serverService;
 
     @Transactional
-    public void addMemberToServer(Long serverId, String targetUsername, ServerRole role, String adminUsername) {
+    public void addMemberToServer(Long serverId, String targetUsername, MessageServerRole role, String adminUsername) {
         if (!serverService.isUserAdmin(serverId, adminUsername)) {
             throw new SecurityException("Only server administrators can add members.");
         }
@@ -30,10 +30,10 @@ public class ServerMembershipService {
             throw new IllegalStateException("User is already a member of this server.");
         }
 
-        ServerMember member = new ServerMember();
+        MessageServerMember member = new MessageServerMember();
         member.setServerId(serverId);
         member.setUserId(targetUser.getId());
-        member.setRole(role != null ? role : ServerRole.MEMBER);
+        member.setRole(role != null ? role : MessageServerRole.MEMBER);
 
         serverMemberRepository.save(member);
     }
@@ -49,12 +49,12 @@ public class ServerMembershipService {
     }
 
     @Transactional
-    public void updateMemberRole(Long serverId, Long targetUserId, ServerRole newRole, String adminUsername) {
+    public void updateMemberRole(Long serverId, Long targetUserId, MessageServerRole newRole, String adminUsername) {
         if (!isUserAdmin(serverId, adminUsername)) {
             throw new SecurityException("Only server administrators can change member roles.");
         }
 
-        ServerMember member = serverMemberRepository.findByServerIdAndUserId(serverId, targetUserId)
+        MessageServerMember member = serverMemberRepository.findByServerIdAndUserId(serverId, targetUserId)
                 .orElseThrow(() -> new IllegalArgumentException("User is not a member of this server."));
 
         member.setRole(newRole);
@@ -68,7 +68,7 @@ public class ServerMembershipService {
         }
 
         return serverMemberRepository.findByServerIdAndUserId(serverId, user.getId())
-                .map(member -> member.getRole() == ServerRole.ADMINISTRATOR)
+                .map(member -> member.getRole() == MessageServerRole.ADMINISTRATOR)
                 .orElse(false);
     }
 }

@@ -1,9 +1,6 @@
 package cz.upce.fei.ems.backend.service;
 
-import cz.upce.fei.ems.backend.domain.AppUser;
-import cz.upce.fei.ems.backend.domain.MessageServer;
-import cz.upce.fei.ems.backend.domain.ServerMember;
-import cz.upce.fei.ems.backend.domain.ServerRole;
+import cz.upce.fei.ems.backend.domain.*;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.MessageServerRepository;
 import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
@@ -27,14 +24,14 @@ public class ServerService {
 
         List<Long> serverIds = serverMemberRepository.findByUserId(user.getId())
                 .stream()
-                .map(ServerMember::getServerId)
+                .map(MessageServerMember::getServerId)
                 .toList();
 
         return serverRepository.findAllById(serverIds);
     }
 
     @Transactional
-    public MessageServer createServer(String serverName, cz.upce.fei.ems.backend.domain.ServerType type, String username) {
+    public MessageServer createServer(String serverName, MessageServerType type, String username) {
         AppUser user = appUserRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -44,10 +41,10 @@ public class ServerService {
         MessageServer savedServer = serverRepository.save(server);
 
         // Creator automatically becomes an ADMIN of the server
-        ServerMember member = new ServerMember();
+        MessageServerMember member = new MessageServerMember();
         member.setServerId(savedServer.getId());
         member.setUserId(user.getId());
-        member.setRole(ServerRole.ADMINISTRATOR);
+        member.setRole(MessageServerRole.ADMINISTRATOR);
         serverMemberRepository.save(member);
 
         return savedServer;
@@ -64,7 +61,7 @@ public class ServerService {
         if (user == null) return false;
 
         return serverMemberRepository.findByServerIdAndUserId(serverId, user.getId())
-                .map(member -> member.getRole() == ServerRole.ADMINISTRATOR)
+                .map(member -> member.getRole() == MessageServerRole.ADMINISTRATOR)
                 .orElse(false);
     }
 

@@ -2,6 +2,8 @@ package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.UserKey;
+import cz.upce.fei.ems.backend.dto.UserKeyResponseDto;
+import cz.upce.fei.ems.backend.dto.UserResponseDto;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.UserKeyRepository;
 import lombok.RequiredArgsConstructor;
@@ -51,5 +53,23 @@ public class UserService {
 
     public Optional<UserKey> getActivePublicKeysBatch(List<Long> userIds) {
         return userKeyRepository.findByUserIdInAndRevokedAtIsNull(userIds);
+    }
+
+    public UserResponseDto mapToUserResponse(AppUser user) {
+        return UserResponseDto.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .displayName(user.getDisplayName())
+                .createdAt(user.getCreatedAt())
+                .isBanned(user.isBanned())
+                .isMainAdmin(user.isMainAdmin())
+                .build();
+    }
+
+    public UserKeyResponseDto mapToKeyResponse(UserKey userKey) {
+        return UserKeyResponseDto.builder()
+                .id(userKey.getId())
+                .publicKey(userKey.getPublicKey())
+                .build();
     }
 }

@@ -28,5 +28,5 @@ public class MessageServer {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false, length = 20)
-    private ServerType type;
+    private MessageServerType type;
 }

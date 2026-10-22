@@ -13,8 +13,8 @@ import java.time.OffsetDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
-@IdClass(ServerMemberId.class)
-public class ServerMember {
+@IdClass(MessageServerMemberId.class)
+public class MessageServerMember {
     @Id
     @Column(name = "server_id", nullable = false)
     private Long serverId;
@@ -25,7 +25,7 @@ public class ServerMember {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
-    private ServerRole role;
+    private MessageServerRole role;
 
     @CreationTimestamp(source = SourceType.DB)
     @Column(name = "joined_at", nullable = false, updatable = false)

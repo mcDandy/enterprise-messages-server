@@ -41,7 +41,7 @@ class MessagePersistenceIntegrationTest {
         // 2. Server
         MessageServer server = new MessageServer();
         server.setName("Test Server");
-        server.setType(ServerType.ORGANIZATION);
+        server.setType(MessageServerType.ORGANIZATION);
         server = serverRepository.saveAndFlush(server);
 
         // 3. Kanál
@@ -143,7 +143,7 @@ class MessagePersistenceIntegrationTest {
         // 1. Vytvoříme server
         MessageServer server = new MessageServer();
         server.setName("Key Constraint Test");
-        server.setType(ServerType.ORGANIZATION);
+        server.setType(MessageServerType.ORGANIZATION);
         server = serverRepository.saveAndFlush(server);
 
         // 2. Vytvoříme kanál
@@ -185,7 +185,7 @@ class MessagePersistenceIntegrationTest {
         // 2. Vytvoříme server
         MessageServer server = new MessageServer();
         server.setName("Foreign Key Test");
-        server.setType(ServerType.ORGANIZATION);
+        server.setType(MessageServerType.ORGANIZATION);
         server = serverRepository.saveAndFlush(server);
 
         // 3. Dva různé kanály
