@@ -35,6 +35,34 @@ converts receipts to one user/channel state; old receipts are archived in
 `message_receipt_legacy`. Existing databases do not update automatically when
 files in `database/` change.
 
+## Firebase and channel-version cleanup (migration 003)
+
+When updating an **existing** installation, back up PostgreSQL, stop the
+backend, and run migration 003 once before starting the new backend. This
+permanently deletes stored FCM tokens and key hashes, assigns new UUIDs to
+all existing key-version records, but preserves `message.channel_key_id` FK
+references and historic ciphertext. **Coordinate with Radek first:** clients
+that retained mappings of old integer versions must migrate their local
+metadata/keys, or historic ciphertext may no longer be decryptable:
+
+Windows PowerShell:
+
+```powershell
+Get-Content -Raw -Encoding UTF8 .\database\migrations\003_cleanup_keys_and_firebase.sql |
+  docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U nnpro -d nnpro
+```
+
+Linux:
+
+```sh
+docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U nnpro -d nnpro < database/migrations/003_cleanup_keys_and_firebase.sql
+```
+
+For a second company installation, add the corresponding `-p PROJECT` and
+`--env-file FILE` arguments before `exec`. Fresh databases initialized from
+the updated `schema.sql` do not need this migration. Earlier historical
+migration files are deliberately unchanged.
+
 ## Development mode
 
 Use the existing `compose.dev.yaml` to compile and run through Gradle **in a

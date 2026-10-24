@@ -7,6 +7,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SourceType;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "message_channel_key")
@@ -23,14 +24,11 @@ public class ChannelKey {
     private Long channelId;
 
     @Column(name = "version", nullable = false)
-    private Integer version;
+    private UUID version;
 
     @CreationTimestamp(source = SourceType.DB)
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
-
-    @Column(name = "key_hash", nullable = false)
-    private byte[] keyHash;
 
     @Column(name = "invalidated_at")
     private OffsetDateTime invalidatedAt;

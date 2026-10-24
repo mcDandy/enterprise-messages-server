@@ -53,8 +53,8 @@ class MessagePersistenceIntegrationTest {
         // 4. První verze šifrovacího klíče
         ChannelKey key1 = new ChannelKey();
         key1.setChannelId(channel.getId());
-        key1.setVersion(1);
-        key1.setKeyHash(new byte[]{1, 2, 3});
+        key1.setVersion(UUID.randomUUID());
+        UUID firstVersion = key1.getVersion();
         key1 = keyRepository.saveAndFlush(key1);
 
         assertNotNull(key1.getId());
@@ -74,8 +74,7 @@ class MessagePersistenceIntegrationTest {
         // 7. Druhá verze klíče
         ChannelKey key2 = new ChannelKey();
         key2.setChannelId(channel.getId());
-        key2.setVersion(2);
-        key2.setKeyHash(new byte[]{4, 5, 6});
+        key2.setVersion(UUID.randomUUID());
         key2 = keyRepository.saveAndFlush(key2);
 
         // 8. Druhá zpráva používá nový klíč
@@ -112,7 +111,7 @@ class MessagePersistenceIntegrationTest {
         assertEquals(
                 key1.getId(),
                 keyRepository.findByChannelIdAndVersion(
-                        channel.getId(), 1
+                        channel.getId(), firstVersion
                 ).orElseThrow().getId()
         );
 
@@ -155,15 +154,13 @@ class MessagePersistenceIntegrationTest {
         // 3. První aktivní klíč
         ChannelKey key1 = new ChannelKey();
         key1.setChannelId(channel.getId());
-        key1.setVersion(1);
-        key1.setKeyHash(new byte[]{1, 2, 3});
+        key1.setVersion(UUID.randomUUID());
         keyRepository.saveAndFlush(key1);
 
         // 4. Druhý aktivní klíč stejného kanálu
         ChannelKey key2 = new ChannelKey();
         key2.setChannelId(channel.getId());
-        key2.setVersion(2);
-        key2.setKeyHash(new byte[]{4, 5, 6});
+        key2.setVersion(UUID.randomUUID());
 
         // Databáze musí druhý aktivní klíč odmítnout
         assertThrows(
@@ -202,8 +199,7 @@ class MessagePersistenceIntegrationTest {
         // 4. Klíč patřící kanálu IT
         ChannelKey itKey = new ChannelKey();
         itKey.setChannelId(it.getId());
-        itKey.setVersion(1);
-        itKey.setKeyHash(new byte[]{1, 2, 3});
+        itKey.setVersion(UUID.randomUUID());
         itKey = keyRepository.saveAndFlush(itKey);
 
         // 5. Zpráva patří HR, ale používá IT klíč

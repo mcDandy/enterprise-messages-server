@@ -75,6 +75,14 @@ labels rather than disabling SELinux or changing private-key permissions to 777.
 - For a real company deployment, **provide a trusted company/public-CA certificate**
   rather than relying on an automatically generated self-signed development cert.
 
+## Offline push notification status
+
+The Firebase Cloud Messaging integration was removed. The backend still
+supports real-time WebSocket messaging but **does not currently send Android
+push notifications when the app is suspended or disconnected**. The semester
+assignment requires offline notifications; the Android/backend team must
+agree on and implement a replacement before claiming the requirement is met.
+
 ## Multiple independent company installations on one machine
 
 Each installation is its own Compose project with its own PostgreSQL volume,
@@ -150,3 +158,25 @@ One default backend instance uses a **fixed external port** for Android. To run
 multiple backend instances on one host, introduce a reverse proxy/load balancer
 with one stable public HTTPS/WSS endpoint. Cross-instance WebSocket delivery
 also needs application-level coordination; scaling containers alone is insufficient.
+
+## Channel encryption version metadata (client protocol transition)
+
+`message_channel_key` is **metadata only**: `id` (BIGINT), `channel_id`,
+`version` (UUID), `created_at`, and `invalidated_at`. It stores no secret,
+key hash or wrapped key. Each `message.channel_key_id` remains an 8-byte FK,
+while `GET /api/channels/{channelId}/messages` and `/recent` also return
+`keyVersion` (UUID) for clients to select a locally held decrypting key.
+
+A metadata-only rotation handshake replaces the old hash/new-key payload:
+`ROTATE_KEY` request is a 36-byte ASCII request UUID; the client response must
+contain that request UUID followed by a 36-byte ASCII version UUID. The server
+persists the new version and sends back the UUID (36 ASCII bytes) using
+`MULTICAST_ROTATED_KEY`. **This is not a complete n-way ECDH implementation.**
+David and Radek must define the authenticated client-to-client group negotiation,
+offline recovery, safe distribution of encrypted key material, client key storage,
+and the rotation trigger. No raw symmetric key should go through that ACK.
+
+Historic numeric DB versions are assigned fresh UUIDs by migration 003 while
+preserving numeric `message.channel_key_id` links. If old Android clients have
+local key mappings, migrate them in a coordinated rollout before deployment;
+otherwise old history may become undecryptable despite retaining ciphertext.

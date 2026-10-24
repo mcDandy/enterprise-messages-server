@@ -61,14 +61,4 @@ public class UserController {
         return ResponseEntity.ok(keys);
     }
 
-    @PostMapping("/fcm-token")
-    public ResponseEntity<Void> updateFcmToken(@RequestBody Map<String, String> request, Principal principal) {
-        String token = request.get("fcmToken");
-        AppUser user = appUserRepository.findByUsername(principal.getName())
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + principal.getName()));
-
-        user.setFcmToken(token);
-        appUserRepository.save(user);
-        return ResponseEntity.ok().build();
-    }
 }

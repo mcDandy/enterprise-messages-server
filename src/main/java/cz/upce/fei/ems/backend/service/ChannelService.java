@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
-import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -17,33 +17,37 @@ public class ChannelService {
     private final ChannelRepository channelRepository;
     private final ChannelKeyRepository channelKeyRepository;
 
-
     @Transactional(readOnly = true)
-    public byte[] getActiveChannelKeyHash(Long channelId) {
-        ChannelKey activeKey = channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId)
-                .orElseThrow(() -> new IllegalArgumentException("Active key not found for channel ID: " + channelId));
-        return activeKey.getKeyHash();
+    public ChannelKey getActiveChannelKeyVersion(Long channelId) {
+        return channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Active key version not found for channel ID: " + channelId));
     }
 
-
+    /**
+     * Stores public metadata only. The actual E2EE key is generated and retained by clients.
+     * The caller must ensure that an authorized channel member completed key negotiation.
+     */
     @Transactional
-    public void rotateChannelKey(Long channelId, byte[] newKeyHash) {
-        // 1. Invalidate the current active key if it exists
-        channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId).ifPresent(oldKey -> {
-            oldKey.setInvalidatedAt(OffsetDateTime.now());
-            channelKeyRepository.save(oldKey);
+    public ChannelKey rotateChannelKey(Long channelId, UUID newVersion) {
+        if (newVersion == null) {
+            throw new IllegalArgumentException("Key version UUID is required.");
+        }
+        if (!channelRepository.existsById(channelId)) {
+            throw new IllegalArgumentException("Channel not found: " + channelId);
+        }
+        if (channelKeyRepository.findByChannelIdAndVersion(channelId, newVersion).isPresent()) {
+            throw new IllegalArgumentException("Key version already exists in channel: " + newVersion);
+        }
+
+        channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId).ifPresent(previous -> {
+            previous.setInvalidatedAt(OffsetDateTime.now());
+            channelKeyRepository.saveAndFlush(previous);
         });
 
-        // 2. Determine the version number for the new key
-        List<ChannelKey> existingKeys = channelKeyRepository.findByChannelIdOrderByVersionDesc(channelId);
-        int nextVersion = existingKeys.isEmpty() ? 1 : existingKeys.get(0).getVersion() + 1;
-
-        // 3. Create and save the new key record
-        ChannelKey newChannelKey = new ChannelKey();
-        newChannelKey.setChannelId(channelId);
-        newChannelKey.setVersion(nextVersion);
-        newChannelKey.setKeyHash(newKeyHash);
-
-        channelKeyRepository.save(newChannelKey);
+        ChannelKey next = new ChannelKey();
+        next.setChannelId(channelId);
+        next.setVersion(newVersion);
+        return channelKeyRepository.saveAndFlush(next);
     }
 }
