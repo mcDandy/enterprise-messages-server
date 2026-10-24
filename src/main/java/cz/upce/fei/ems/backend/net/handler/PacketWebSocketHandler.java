@@ -4,7 +4,9 @@ import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.session.SessionRegistry;
+import cz.upce.fei.ems.backend.service.KeyRotationService;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
@@ -18,26 +20,29 @@ public class PacketWebSocketHandler extends BinaryWebSocketHandler {
     private final PacketCodec packetCodec;
     private final PacketDispatcher packetDispatcher;
     private final SessionRegistry sessionRegistry;
+    private final KeyRotationService keyRotationService;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         String username = (String) session.getAttributes().get("username");
         if (username != null) {
             sessionRegistry.registerSession(username, session);
+            keyRotationService.processPendingOnConnect(username, session);
+
         } else {
             session.close(CloseStatus.NOT_ACCEPTABLE);
         }
     }
 
     @Override
-    protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) throws Exception {
+    protected void handleBinaryMessage(@NonNull WebSocketSession session, BinaryMessage message) throws Exception {
         Packet packet = packetCodec.decode(message.getPayload());
 
         packetDispatcher.sendTo(session, packet);
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+    public void afterConnectionClosed(@NonNull WebSocketSession session, @NonNull CloseStatus status) {
         sessionRegistry.unregisterSession(session);
     }
 }

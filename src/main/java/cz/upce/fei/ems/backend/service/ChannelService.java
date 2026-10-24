@@ -60,11 +60,7 @@ public class ChannelService {
         member.setUserId(creator.getId());
         channelMemberRepository.save(member);
 
-        try {
-            keyRotationService.solicitateNewKeyRotation(savedChannel.getId(), Set.of(creatorUsername));
-        } catch (Exception e) {
-            // todo message que :D
-        }
+        keyRotationService.solicitateNewKeyRotation(savedChannel.getId(), Set.of(creatorUsername));
 
         return savedChannel;
     }
