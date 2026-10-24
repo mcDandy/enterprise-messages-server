@@ -35,6 +35,7 @@ public class KeyRotationService {
         WebSocketSession selected = selectOnlineClient(currentChannelMembers);
         if (selected == null) {
             throw new IllegalStateException("No online client available for key rotation in channel " + channelId);
+            //todo put in in message que
         }
 
         try {

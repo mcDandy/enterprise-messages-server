@@ -28,7 +28,7 @@ import java.util.List;
 @RequestMapping("/api/servers")
 @RequiredArgsConstructor
 @Tag(name = "Servers", description = "Server management and CRUD operations")
-public class ServerController {
+public class MessageServerController {
 
     private final MessageServerService serverService;
     private final MessageServerRepository serverRepository;

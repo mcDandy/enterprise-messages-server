@@ -1,14 +1,10 @@
 package cz.upce.fei.ems.backend.controller;
 
-import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.dto.ChannelResponseDto;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
-import cz.upce.fei.ems.backend.repository.AppUserRepository;
-import cz.upce.fei.ems.backend.repository.ChannelRepository;
-import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
-import cz.upce.fei.ems.backend.service.MessageServerService;
+import cz.upce.fei.ems.backend.service.ChannelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -29,10 +25,7 @@ import java.util.List;
 @Tag(name = "Channels", description = "Channel CRUD operations and management")
 public class ChannelController {
 
-    private final ChannelRepository channelRepository;
-    private final MessageServerService serverService;
-    private final AppUserRepository appUserRepository;
-    private final ServerMemberRepository serverMemberRepository;
+    private final ChannelService channelService;
 
     @Operation(
             summary = "Get channels",
@@ -44,7 +37,7 @@ public class ChannelController {
     )
     @GetMapping
     public ResponseEntity<List<ChannelResponseDto>> getChannels(@PathVariable Long serverId) {
-        List<ChannelResponseDto> channels = channelRepository.findByServerIdOrderByNameAsc(serverId).stream()
+        List<ChannelResponseDto> channels = channelService.getChannelsByServerId(serverId).stream()
                 .map(ChannelResponseDto::fromEntity)
                 .toList();
         return ResponseEntity.ok(channels);
@@ -61,16 +54,16 @@ public class ChannelController {
     )
     @GetMapping("/{channelId}")
     public ResponseEntity<ChannelResponseDto> getChannel(@PathVariable Long serverId, @PathVariable Long channelId) {
-        return channelRepository.findById(channelId)
-                .filter(channel -> channel.getServerId().equals(serverId))
-                .map(ChannelResponseDto::fromEntity)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        Channel channel = channelService.getChannelById(serverId, channelId);
+        if (channel == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(ChannelResponseDto.fromEntity(channel));
     }
 
     @Operation(
             summary = "Create channel",
-            description = "Creates a new channel in the server (Admin only).",
+            description = "Creates a new channel in the server and adds the creator as a channel member (Admin only).",
             responses = {
                     @ApiResponse(responseCode = "201", description = "Channel created successfully",
                             content = @Content(schema = @Schema(implementation = ChannelResponseDto.class))),
@@ -85,20 +78,14 @@ public class ChannelController {
             @Valid @RequestBody CreateChannelRequestDto request,
             Principal principal) {
 
-        if (!serverService.isUserAdmin(serverId, principal.getName())) {
+        try {
+            Channel savedChannel = channelService.createChannel(serverId, request, principal.getName());
+            return ResponseEntity.status(HttpStatus.CREATED).body(ChannelResponseDto.fromEntity(savedChannel));
+        } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        if (channelRepository.existsByServerIdAndName(serverId, request.getName())) {
+        } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
-
-        Channel channel = new Channel();
-        channel.setServerId(serverId);
-        channel.setName(request.getName());
-
-        Channel savedChannel = channelRepository.save(channel);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ChannelResponseDto.fromEntity(savedChannel));
     }
 
     @Operation(
@@ -118,18 +105,15 @@ public class ChannelController {
             @Valid @RequestBody UpdateChannelRequestDto request,
             Principal principal) {
 
-        if (!serverService.isUserAdmin(serverId, principal.getName())) {
+        try {
+            Channel updatedChannel = channelService.updateChannel(serverId, channelId, request, principal.getName());
+            if (updatedChannel == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(ChannelResponseDto.fromEntity(updatedChannel));
+        } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-
-        return channelRepository.findById(channelId)
-                .filter(channel -> channel.getServerId().equals(serverId))
-                .map(channel -> {
-                    channel.setName(request.getName());
-                    Channel saved = channelRepository.save(channel);
-                    return ResponseEntity.ok(ChannelResponseDto.fromEntity(saved));
-                })
-                .orElse(ResponseEntity.notFound().build());
     }
 
     @Operation(
@@ -147,17 +131,12 @@ public class ChannelController {
             @PathVariable Long channelId,
             Principal principal) {
 
-        if (!serverService.isUserAdmin(serverId, principal.getName())) {
+        try {
+            channelService.deleteChannel(serverId, channelId, principal.getName());
+            return ResponseEntity.noContent().build();
+        } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-
-        return channelRepository.findById(channelId)
-                .filter(channel -> channel.getServerId().equals(serverId))
-                .map(channel -> {
-                    channelRepository.delete(channel);
-                    return ResponseEntity.noContent().<Void>build();
-                })
-                .orElse(ResponseEntity.notFound().build());
     }
 
     @Operation(
@@ -174,19 +153,14 @@ public class ChannelController {
             @PathVariable Long serverId,
             Principal principal) {
 
-        AppUser user = appUserRepository.findByUsername(principal.getName())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        if (!serverMemberRepository.existsByServerIdAndUserId(serverId, user.getId())) {
-            throw new SecurityException("You are not a member of this server.");
+        try {
+            List<ChannelResponseDto> channels = channelService.getMyChannelsForServer(serverId, principal.getName())
+                    .stream()
+                    .map(ChannelResponseDto::fromEntity)
+                    .toList();
+            return ResponseEntity.ok(channels);
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-
-        List<ChannelResponseDto> channels
-                = channelRepository.findAccessibleChannelsByServerIdAndUserId(serverId, user.getId())
-                .stream()
-                .map(ChannelResponseDto::fromEntity)
-                .toList();
-
-        return ResponseEntity.ok(channels);
     }
 }
