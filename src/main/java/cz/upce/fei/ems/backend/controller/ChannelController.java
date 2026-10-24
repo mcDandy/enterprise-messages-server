@@ -8,7 +8,7 @@ import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelRepository;
 import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
-import cz.upce.fei.ems.backend.service.ServerService;
+import cz.upce.fei.ems.backend.service.MessageServerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -30,7 +30,7 @@ import java.util.List;
 public class ChannelController {
 
     private final ChannelRepository channelRepository;
-    private final ServerService serverService;
+    private final MessageServerService serverService;
     private final AppUserRepository appUserRepository;
     private final ServerMemberRepository serverMemberRepository;
 

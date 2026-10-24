@@ -12,7 +12,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class ServerService {
+public class MessageServerService {
 
     private final MessageServerRepository serverRepository;
     private final ServerMemberRepository serverMemberRepository;

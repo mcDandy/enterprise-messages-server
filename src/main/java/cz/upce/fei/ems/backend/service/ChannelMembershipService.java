@@ -8,13 +8,18 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class ChannelMembershipService {
 
     private final ChannelMemberRepository channelMemberRepository;
     private final AppUserRepository appUserRepository;
-    private final ServerService serverService;
+    private final MessageServerService serverService;
+    private final KeyRotationService keyRotationService;
 
     @Transactional
     public void addMemberToChannel(Long serverId, Long channelId, String targetUsername, String adminUsername) {
@@ -34,6 +39,8 @@ public class ChannelMembershipService {
         member.setUserId(targetUser.getId());
 
         channelMemberRepository.save(member);
+
+        triggerKeyRotation(channelId);
     }
 
     @Transactional
@@ -43,6 +50,25 @@ public class ChannelMembershipService {
         }
 
         channelMemberRepository.findById(new cz.upce.fei.ems.backend.domain.ChannelMemberId(channelId, targetUserId))
-                .ifPresent(channelMemberRepository::delete);
+                .ifPresent(member -> {
+                    channelMemberRepository.delete(member);
+                    triggerKeyRotation(channelId);
+                });
+    }
+
+    private void triggerKeyRotation(Long channelId) {
+        try {
+            Set<String> currentMembers = channelMemberRepository.findByChannelId(channelId).stream()
+                    .map(member -> appUserRepository.findById(member.getUserId()).orElse(null))
+                    .filter(Objects::nonNull)
+                    .map(AppUser::getUsername)
+                    .collect(Collectors.toSet());
+
+            if (!currentMembers.isEmpty()) {
+                keyRotationService.solicitateNewKeyRotation(channelId, currentMembers);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to trigger key rotation for channel " + channelId + ": " + e.getMessage());
+        }
     }
 }

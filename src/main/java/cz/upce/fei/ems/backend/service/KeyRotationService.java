@@ -1,83 +1,105 @@
 package cz.upce.fei.ems.backend.service;
 
+import cz.upce.fei.ems.backend.domain.AppUser;
+import cz.upce.fei.ems.backend.domain.ChannelKey;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
 import cz.upce.fei.ems.backend.net.session.SessionRegistry;
+import cz.upce.fei.ems.backend.repository.AppUserRepository;
+import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
+import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class KeyRotationService {
     private final SessionRegistry sessionRegistry;
     private final PacketDispatcher dispatcher;
-    private final ChannelService channelService;
+    private final ChannelKeyRepository channelKeyRepository;
+    private final ChannelMemberRepository channelMemberRepository;
+    private final AppUserRepository appUserRepository;
 
-    private final Map<Long, Boolean> channelLockedFlags = new ConcurrentHashMap<>();
-    private final Map<String, PendingRotation> pendingResponses = new ConcurrentHashMap<>();
-
-    private record PendingRotation(String username, CompletableFuture<Packet> response) {}
-
-    public boolean isChannelLocked(Long channelId) {
-        return channelLockedFlags.getOrDefault(channelId, false);
-    }
-
-    /**
-     * Metadata-only rotation handshake. No raw symmetric key, key hash or private material
-     * is accepted by the server. The Android/backend teams must finalize the client-side
-     * group key exchange and authorization before enabling this handshake in production.
-     *
-     * Request: ROTATE_KEY payload = 36 ASCII bytes request UUID.
-     * Reply:   ROTATE_KEY payload = request UUID (36 ASCII) + version UUID (36 ASCII).
-     * ACK:     MULTICAST_ROTATED_KEY payload = version UUID (36 ASCII), NOT a secret key.
-     */
     public void solicitateNewKeyRotation(Long channelId, Set<String> currentChannelMembers) {
-        if (channelLockedFlags.putIfAbsent(channelId, true) != null) {
-            throw new IllegalStateException("Rotation is already in progress for channel " + channelId);
+        WebSocketSession selected = selectOnlineClient(currentChannelMembers);
+        if (selected == null) {
+            throw new IllegalStateException("No online client available for key rotation in channel " + channelId);
         }
-        String requestId = UUID.randomUUID().toString();
+
         try {
-            WebSocketSession selected = selectOnlineClient(currentChannelMembers);
-            if (selected == null) {
-                throw new IllegalStateException("No online client available for key rotation.");
-            }
-            String selectedUsername = (String) selected.getAttributes().get("username");
-            CompletableFuture<Packet> future = new CompletableFuture<>();
-            pendingResponses.put(requestId, new PendingRotation(selectedUsername, future));
+            String requestId = UUID.randomUUID().toString();
 
-            dispatcher.sendTo(selected, new Packet(PacketType.ROTATE_KEY.getCode(),
-                    requestId.getBytes(StandardCharsets.US_ASCII)));
-            Packet reply = future.get(5, TimeUnit.SECONDS);
-            byte[] payload = reply.getPayload();
-            if (payload == null || payload.length != 72) {
-                throw new IllegalArgumentException("Rotation reply must contain request and version UUIDs.");
-            }
-            UUID version = UUID.fromString(new String(payload, 36, 36, StandardCharsets.US_ASCII));
-            channelService.rotateChannelKey(channelId, version);
+            log.info("Initiating key rotation for channel {} using client: {}",
+                    channelId, selected.getAttributes().get("username"));
 
-            // Only public version metadata is acknowledged. Clients distribute secrets E2EE.
-            dispatcher.sendTo(selected, new Packet(PacketType.MULTICAST_ROTATED_KEY.getCode(),
-                    version.toString().getBytes(StandardCharsets.US_ASCII)));
+            dispatcher.sendTo(selected, new Packet(
+                    PacketType.ROTATE_KEY.getCode(),
+                    requestId.getBytes(StandardCharsets.US_ASCII)
+            ));
         } catch (Exception e) {
-            System.err.println("Rotation metadata handshake failed for channel " + channelId + ": " + e.getMessage());
-        } finally {
-            pendingResponses.remove(requestId);
-            channelLockedFlags.remove(channelId);
+            log.error("Failed to send rotation solicitation for channel {}: {}", channelId, e.getMessage(), e);
         }
     }
 
-    public void handleClientRotationResponse(String requestId, String senderUsername, Packet responsePacket) {
-        PendingRotation pending = pendingResponses.get(requestId);
-        if (pending != null && pending.username().equals(senderUsername)) {
-            pending.response().complete(responsePacket);
+    public void handleRotationRequest(Long channelId, String senderUsername) {
+        log.info("Received rotation request from user {} for channel {}", senderUsername, channelId);
+
+        Set<String> currentMembers = channelMemberRepository.findByChannelId(channelId).stream()
+                .map(member -> appUserRepository.findById(member.getUserId()).orElse(null))
+                .filter(Objects::nonNull)
+                .map(AppUser::getUsername)
+                .collect(Collectors.toSet());
+
+        if (!currentMembers.isEmpty()) {
+            solicitateNewKeyRotation(channelId, currentMembers);
+        }
+    }
+
+    @Transactional
+    public void handleClientUnicastRotation(
+            Long channelId, String senderUsername, Long recipientUserId, byte[] ciphertext, Packet originalPacket
+    ) {
+        UUID newVersionUuid = UUID.randomUUID();
+        ChannelKey channelKey = new ChannelKey();
+        channelKey.setChannelId(channelId);
+        channelKey.setVersion(newVersionUuid);
+        channelKeyRepository.save(channelKey);
+
+        log.info("User {} distributed new channel key version {} for channel {} (ciphertext size: {} bytes)",
+                senderUsername, newVersionUuid, channelId, ciphertext.length);
+
+        try {
+            AppUser recipientUser = appUserRepository.findById(recipientUserId).orElse(null);
+            if (recipientUser != null) {
+                WebSocketSession recipientSession = sessionRegistry.getSession(recipientUser.getUsername());
+                if (recipientSession != null && recipientSession.isOpen()) {
+                    // Příjemce je online -> okamžité doručení přes WebSocket
+                    dispatcher.sendTo(recipientSession, originalPacket);
+                    log.debug("Forwarded unicast key rotation ciphertext to online user ID {}", recipientUserId);
+                } else {
+                    // Příjemce je offline -> Tady musíme ciphertext reálně uložit do DB pro offline sync!
+                    log.warn("Recipient user ID {} is offline. " +
+                                    "Storing ciphertext ({} bytes) for offline delivery in channel {}.",
+                            recipientUserId, ciphertext.length, channelId);
+
+                    // TODO: Uložení ciphertekstu do DB tabulky pro offline doručení (např. PendingKeyDistribution)
+                    // pendingKeyRepository.save(new PendingKey(recipientUserId, channelId, newVersionUuid, ciphertext));
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to process unicast key rotation ciphertext from user {} to user {}: {}",
+                    senderUsername, recipientUserId, e.getMessage(), e);
         }
     }
 

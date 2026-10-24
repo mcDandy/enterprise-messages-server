@@ -12,7 +12,7 @@ public enum PacketType {
     MESSAGE_RECEIPT((byte) 0x03),
     CHANNEL_JOIN((byte) 0x04),
     ROTATE_KEY((byte) 0x0a),
-    MULTICAST_ROTATED_KEY((byte) 0x0b);
+    UNICAST_KEY_ROTATION((byte) 0x0b);
 
     private final byte code;
 

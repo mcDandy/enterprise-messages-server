@@ -15,7 +15,7 @@ public class ServerMembershipService {
 
     private final ServerMemberRepository serverMemberRepository;
     private final AppUserRepository appUserRepository;
-    private final ServerService serverService;
+    private final MessageServerService serverService;
 
     @Transactional
     public void addMemberToServer(Long serverId, String targetUsername, MessageServerRole role, String adminUsername) {
