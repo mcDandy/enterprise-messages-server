@@ -40,10 +40,7 @@ public class KeyRotationService {
         try {
             WebSocketSession selected = selectOnlineClient(currentChannelMembers);
             if (selected == null) {
-                log.warn(
-                        "No online client available for channel {}. Storing pending rotation trigger in DB.",
-                        channelId
-                );
+                log.warn("No online client available for channel {}. Storing pending rotation trigger in DB.", channelId);
 
                 if (channelRotationPendingRepository.findByChannelId(channelId).isEmpty()) {
                     ChannelRotationPending pending = new ChannelRotationPending();
@@ -58,12 +55,15 @@ public class KeyRotationService {
             channelRotationPendingRepository.deleteByChannelId(channelId);
 
             String requestId = UUID.randomUUID().toString();
-            log.info("Initiating key rotation for channel {} using client: {}",
-                    channelId, selected.getAttributes().get("username"));
+
+            String payloadPayload = requestId + ":" + channelId;
+
+            log.info("Initiating key rotation for channel {} using client: {} (requestId: {})",
+                    channelId, selected.getAttributes().get("username"), requestId);
 
             dispatcher.sendTo(selected, new Packet(
                     PacketType.ROTATE_KEY.getCode(),
-                    requestId.getBytes(StandardCharsets.US_ASCII)
+                    payloadPayload.getBytes(StandardCharsets.US_ASCII)
             ));
         } catch (Exception e) {
             log.error("Failed to send rotation solicitation for channel {}: {}", channelId, e.getMessage(), e);
