@@ -1,14 +1,12 @@
 package cz.upce.fei.ems.backend.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
-@Schema(description = "Požadavek na přidání uživatele do kanálu")
+@Getter
+@Setter
 public class AddChannelMemberRequestDto {
-
-    @NotBlank(message = "Uživatelské jméno je povinné")
-    @Schema(example = "jan_novak")
-    private String username;
+    @NotNull(message = "User ID is required")
+    private Long userId;
 }

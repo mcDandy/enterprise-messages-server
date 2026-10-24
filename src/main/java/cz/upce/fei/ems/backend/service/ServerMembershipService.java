@@ -18,21 +18,22 @@ public class ServerMembershipService {
     private final MessageServerService serverService;
 
     @Transactional
-    public void addMemberToServer(Long serverId, String targetUsername, MessageServerRole role, String adminUsername) {
+    public void addMemberToServer(Long serverId, Long targetUserId, MessageServerRole role, String adminUsername) {
         if (!serverService.isUserAdmin(serverId, adminUsername)) {
             throw new SecurityException("Only server administrators can add members.");
         }
 
-        AppUser targetUser = appUserRepository.findByUsername(targetUsername)
-                .orElseThrow(() -> new IllegalArgumentException("Target user not found"));
+        if (!appUserRepository.existsById(targetUserId)) {
+            throw new IllegalArgumentException("Target user with ID " + targetUserId + " not found");
+        }
 
-        if (serverMemberRepository.findByServerIdAndUserId(serverId, targetUser.getId()).isPresent()) {
+        if (serverMemberRepository.findByServerIdAndUserId(serverId, targetUserId).isPresent()) {
             throw new IllegalStateException("User is already a member of this server.");
         }
 
         MessageServerMember member = new MessageServerMember();
         member.setServerId(serverId);
-        member.setUserId(targetUser.getId());
+        member.setUserId(targetUserId);
         member.setRole(role != null ? role : MessageServerRole.MEMBER);
 
         serverMemberRepository.save(member);
