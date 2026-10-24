@@ -1,6 +1,6 @@
 package cz.upce.fei.ems.backend.domain;
 
-public enum ServerType {
+public enum MessageServerType {
     ORGANIZATION,
     DIRECT
 }

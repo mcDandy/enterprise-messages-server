@@ -1,14 +1,14 @@
 package cz.upce.fei.ems.backend.repository;
 
-import cz.upce.fei.ems.backend.domain.ServerMember;
-import cz.upce.fei.ems.backend.domain.ServerMemberId;
+import cz.upce.fei.ems.backend.domain.MessageServerMember;
+import cz.upce.fei.ems.backend.domain.MessageServerMemberId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
-public interface ServerMemberRepository extends JpaRepository<ServerMember, ServerMemberId> {
-    List<ServerMember> findByUserId(Long userId);
-    List<ServerMember> findByServerId(Long serverId);
+public interface ServerMemberRepository extends JpaRepository<MessageServerMember, MessageServerMemberId> {
+    List<MessageServerMember> findByUserId(Long userId);
+    List<MessageServerMember> findByServerId(Long serverId);
     boolean existsByServerIdAndUserId(Long serverId, Long userId);
-    Optional<ServerMember> findByServerIdAndUserId(Long serverId, Long userId);
+    Optional<MessageServerMember> findByServerIdAndUserId(Long serverId, Long userId);
 }

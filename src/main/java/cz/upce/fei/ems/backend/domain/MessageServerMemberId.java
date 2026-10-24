@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode
-public class ServerMemberId implements Serializable {
+public class MessageServerMemberId implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
     private Long serverId;

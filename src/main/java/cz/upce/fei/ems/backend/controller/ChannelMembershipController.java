@@ -1,17 +1,21 @@
 package cz.upce.fei.ems.backend.controller;
 
-import cz.upce.fei.ems.backend.domain.ChannelMember;
+import cz.upce.fei.ems.backend.dto.AddChannelMemberRequestDto;
+import cz.upce.fei.ems.backend.dto.ChannelMemberResponseDto;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.service.ChannelMembershipService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/servers/{serverId}/channels/{channelId}/members")
@@ -22,30 +26,51 @@ public class ChannelMembershipController {
     private final ChannelMembershipService channelMembershipService;
     private final ChannelMemberRepository channelMemberRepository;
 
-    @Operation(summary = "Get channel members", description = "Lists all members assigned to a specific channel.")
+    @Operation(
+            summary = "Get channel members",
+            description = "Lists all members assigned to a specific channel.",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "List of channel members retrieved successfully",
+                            content = @Content(schema = @Schema(implementation = ChannelMemberResponseDto.class)))
+            }
+    )
     @GetMapping
-    public ResponseEntity<List<ChannelMember>> getChannelMembers(
+    public ResponseEntity<List<ChannelMemberResponseDto>> getChannelMembers(
             @PathVariable Long serverId,
             @PathVariable Long channelId) {
-        List<ChannelMember> members = channelMemberRepository.findByChannelId(channelId);
+        List<ChannelMemberResponseDto> members = channelMemberRepository.findByChannelId(channelId).stream()
+                .map(ChannelMemberResponseDto::fromEntity)
+                .toList();
         return ResponseEntity.ok(members);
     }
 
-    @Operation(summary = "Add member to channel", description = "Adds a user to the channel (Server Admin only).")
+    @Operation(
+            summary = "Add member to channel",
+            description = "Adds a user to the channel (Server Admin only).",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Member added to channel successfully"),
+                    @ApiResponse(responseCode = "400", description = "Invalid request data", content = @Content),
+                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content)
+            }
+    )
     @PostMapping
     public ResponseEntity<Void> addMemberToChannel(
             @PathVariable Long serverId,
             @PathVariable Long channelId,
-            @RequestBody Map<String, String> request,
+            @Valid @RequestBody AddChannelMemberRequestDto request,
             Principal principal) {
-        String username = request.get("username");
-        channelMembershipService.addMemberToChannel(serverId, channelId, username, principal.getName());
+        channelMembershipService.addMemberToChannel(serverId, channelId, request.getUsername(), principal.getName());
         return ResponseEntity.ok().build();
     }
 
     @Operation(
             summary = "Remove member from channel",
-            description = "Removes a user from the channel (Server Admin only)."
+            description = "Removes a user from the channel (Server Admin only).",
+            responses = {
+                    @ApiResponse(responseCode = "204", description = "Member removed from channel successfully"),
+                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content),
+                    @ApiResponse(responseCode = "404", description = "Member not found", content = @Content)
+            }
     )
     @DeleteMapping("/{userId}")
     public ResponseEntity<Void> removeMemberFromChannel(

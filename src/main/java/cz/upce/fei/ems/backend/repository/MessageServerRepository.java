@@ -3,8 +3,8 @@ package cz.upce.fei.ems.backend.repository;
 import cz.upce.fei.ems.backend.domain.MessageServer;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
-import cz.upce.fei.ems.backend.domain.ServerType;
+import cz.upce.fei.ems.backend.domain.MessageServerType;
 
 public interface MessageServerRepository extends JpaRepository<MessageServer, Long> {
-    List<MessageServer> findByType(ServerType type);
+    List<MessageServer> findByType(MessageServerType type);
 }

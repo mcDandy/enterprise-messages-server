@@ -44,7 +44,7 @@ class DatabaseRelationsIntegrationTest {
         // 2. Vytvoříme server
         MessageServer server = new MessageServer();
         server.setName("Test Organization");
-        server.setType(ServerType.ORGANIZATION);
+        server.setType(MessageServerType.ORGANIZATION);
         server = serverRepository.saveAndFlush(server);
 
         // 3. Vytvoříme kanál na serveru
@@ -54,11 +54,11 @@ class DatabaseRelationsIntegrationTest {
         channel = channelRepository.saveAndFlush(channel);
 
         // 4. Přidáme uživatele na server
-        ServerMember serverMember = new ServerMember();
-        serverMember.setServerId(server.getId());
-        serverMember.setUserId(user.getId());
-        serverMember.setRole(ServerRole.MEMBER);
-        serverMemberRepository.saveAndFlush(serverMember);
+        MessageServerMember messageServerMember = new MessageServerMember();
+        messageServerMember.setServerId(server.getId());
+        messageServerMember.setUserId(user.getId());
+        messageServerMember.setRole(MessageServerRole.MEMBER);
+        serverMemberRepository.saveAndFlush(messageServerMember);
 
         // 5. Přidáme uživatele do kanálu
         ChannelMember channelMember = new ChannelMember();
