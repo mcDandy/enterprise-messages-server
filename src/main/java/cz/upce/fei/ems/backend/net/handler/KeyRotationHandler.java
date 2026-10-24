@@ -8,8 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
-import java.nio.charset.StandardCharsets;
-
 @Component
 @RequiredArgsConstructor
 public class KeyRotationHandler implements PacketHandler {
@@ -30,16 +28,12 @@ public class KeyRotationHandler implements PacketHandler {
             return;
         }
 
-        byte[] payload = packet.getPayload();
-        if (payload == null || payload.length != 72) {
-            dispatcher.sendError(session, "Invalid rotation response payload.");
+        Long channelId = (Long) session.getAttributes().get("currentChannelId");
+        if (channelId == null) {
+            dispatcher.sendError(session, "User is not in an active channel.");
             return;
         }
 
-        // Extract the 36-byte UUID Request ID from the beginning of the payload
-        String requestId = new String(payload, 0, 36, StandardCharsets.UTF_8);
-
-        // Forward the response packet to the service awaiting this request
-        keyRotationService.handleClientRotationResponse(requestId, senderUsername, packet);
+        keyRotationService.handleRotationRequest(channelId, senderUsername);
     }
 }

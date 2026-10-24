@@ -58,7 +58,7 @@ public class ServerMembershipController {
             Principal principal) {
 
         MessageServerRole role = request.getRole() != null ? request.getRole() : MessageServerRole.MEMBER;
-        membershipService.addMemberToServer(serverId, request.getUsername(), role, principal.getName());
+        membershipService.addMemberToServer(serverId, request.getUserId(), role, principal.getName());
         return ResponseEntity.ok().build();
     }
 

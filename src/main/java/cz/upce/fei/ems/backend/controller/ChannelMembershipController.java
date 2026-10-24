@@ -59,7 +59,7 @@ public class ChannelMembershipController {
             @PathVariable Long channelId,
             @Valid @RequestBody AddChannelMemberRequestDto request,
             Principal principal) {
-        channelMembershipService.addMemberToChannel(serverId, channelId, request.getUsername(), principal.getName());
+        channelMembershipService.addMemberToChannel(serverId, channelId, request.getUserId(), principal.getName());
         return ResponseEntity.ok().build();
     }
 
