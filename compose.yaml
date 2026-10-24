@@ -1,5 +1,6 @@
 services:
   db:
+    container_name: ${DB_CONTAINER_NAME:-db}
     image: postgres:17
     environment:
       POSTGRES_DB: nnpro
@@ -19,6 +20,7 @@ services:
   # Development-only certificate provisioning. Runs in Docker, not on the host.
   # Existing private keys are always reused, never silently regenerated.
   cert-init:
+    container_name: ${CERT_INIT_CONTAINER_NAME:-cert-init}
     image: eclipse-temurin:21-jdk
     environment:
       TLS_HOST: ${TLS_HOST:-localhost}
@@ -30,6 +32,7 @@ services:
     restart: "no"
 
   backend:
+    container_name: ${BACKEND_CONTAINER_NAME:-ems-server}
     build:
       context: .
     environment:
