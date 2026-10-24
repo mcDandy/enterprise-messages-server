@@ -48,8 +48,16 @@ first start**; changing it later does not regenerate an existing certificate.
 The self-signed `dev_server.crt` must be trusted by Android. Use a trusted
 certificate outside development.
 
+By default the containers are named `ems-server` and `db`. Set
+`BACKEND_CONTAINER_NAME` and `DB_CONTAINER_NAME` in `.env` to rename them.
+The Compose project name can also be set using `COMPOSE_PROJECT_NAME`.
+Do not change the project name on an existing installation without accounting
+for its PostgreSQL volume.
+
 For independent installations use separate Compose project names, HTTPS ports,
-certificate directories and credentials (configured in each environment file):
+container names, certificate directories and credentials. For example, set
+`BACKEND_CONTAINER_NAME=firma_a-ems-server` and `DB_CONTAINER_NAME=firma_a-db`
+in `.env.firma_a`, and use corresponding unique names in `.env.firma_b`:
 
 ```sh
 docker compose -p firma_a --env-file .env.firma_a up -d --build
