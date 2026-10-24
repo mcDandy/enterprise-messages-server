@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -29,6 +30,9 @@ public class MessageResponseDto {
 
     @Schema(example = "2")
     private Long channelKeyId;
+
+    @Schema(description = "Public UUID identifier of the encryption key generation")
+    private UUID keyVersion;
 
 
     public static MessageResponseDto fromEntity(Message message) {

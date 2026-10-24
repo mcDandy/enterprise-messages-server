@@ -31,7 +31,7 @@ public class KeyRotationHandler implements PacketHandler {
         }
 
         byte[] payload = packet.getPayload();
-        if (payload == null || payload.length < 36) {
+        if (payload == null || payload.length != 72) {
             dispatcher.sendError(session, "Invalid rotation response payload.");
             return;
         }
@@ -40,6 +40,6 @@ public class KeyRotationHandler implements PacketHandler {
         String requestId = new String(payload, 0, 36, StandardCharsets.UTF_8);
 
         // Forward the response packet to the service awaiting this request
-        keyRotationService.handleClientRotationResponse(requestId, packet);
+        keyRotationService.handleClientRotationResponse(requestId, senderUsername, packet);
     }
 }

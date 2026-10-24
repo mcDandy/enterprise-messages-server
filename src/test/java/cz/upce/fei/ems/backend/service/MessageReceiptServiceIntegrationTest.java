@@ -50,10 +50,10 @@ class MessageReceiptServiceIntegrationTest {
         Long keyId = insertId(
                 """
                 INSERT INTO message_channel_key
-                    (channel_id, version, key_hash)
-                VALUES (?, ?, ?) RETURNING id
+                    (channel_id, version)
+                VALUES (?, ?) RETURNING id
                 """,
-                channelId, 1, new byte[]{1, 2, 3});
+                channelId, UUID.randomUUID());
 
         jdbc.update(
                 "INSERT INTO message_channel_member (channel_id, user_id) VALUES (?, ?)",

@@ -39,9 +39,6 @@ public class AppUser implements UserDetails {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    @Column(name = "fcm_token")
-    private String fcmToken;
-
     @Column(name = "is_banned", nullable = false)
     private boolean isBanned = false;
 

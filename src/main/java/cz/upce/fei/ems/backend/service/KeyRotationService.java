@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -18,77 +17,71 @@ import java.util.concurrent.*;
 @Service
 @RequiredArgsConstructor
 public class KeyRotationService {
-
     private final SessionRegistry sessionRegistry;
     private final PacketDispatcher dispatcher;
     private final ChannelService channelService;
 
-    // (channelId -> locked status)
     private final Map<Long, Boolean> channelLockedFlags = new ConcurrentHashMap<>();
+    private final Map<String, PendingRotation> pendingResponses = new ConcurrentHashMap<>();
 
-    // (requestId -> CompletableFuture)
-    private final Map<String, CompletableFuture<Packet>> pendingResponses = new ConcurrentHashMap<>();
+    private record PendingRotation(String username, CompletableFuture<Packet> response) {}
 
     public boolean isChannelLocked(Long channelId) {
         return channelLockedFlags.getOrDefault(channelId, false);
     }
 
+    /**
+     * Metadata-only rotation handshake. No raw symmetric key, key hash or private material
+     * is accepted by the server. The Android/backend teams must finalize the client-side
+     * group key exchange and authorization before enabling this handshake in production.
+     *
+     * Request: ROTATE_KEY payload = 36 ASCII bytes request UUID.
+     * Reply:   ROTATE_KEY payload = request UUID (36 ASCII) + version UUID (36 ASCII).
+     * ACK:     MULTICAST_ROTATED_KEY payload = version UUID (36 ASCII), NOT a secret key.
+     */
     public void solicitateNewKeyRotation(Long channelId, Set<String> currentChannelMembers) {
-        channelLockedFlags.put(channelId, true);
-
+        if (channelLockedFlags.putIfAbsent(channelId, true) != null) {
+            throw new IllegalStateException("Rotation is already in progress for channel " + channelId);
+        }
+        String requestId = UUID.randomUUID().toString();
         try {
-            byte[] trustedKeyHashFromDb = channelService.getActiveChannelKeyHash(channelId);
-
-            WebSocketSession chosenClientSession = selectOldestOrRandomClient(currentChannelMembers);
-            if (chosenClientSession == null) {
-                System.err.println("No online clients available in channel " + channelId + " for key rotation.");
-                return;
+            WebSocketSession selected = selectOnlineClient(currentChannelMembers);
+            if (selected == null) {
+                throw new IllegalStateException("No online client available for key rotation.");
             }
+            String selectedUsername = (String) selected.getAttributes().get("username");
+            CompletableFuture<Packet> future = new CompletableFuture<>();
+            pendingResponses.put(requestId, new PendingRotation(selectedUsername, future));
 
-            String requestId = UUID.randomUUID().toString();
-            Packet rotationRequest = new Packet(
-                    PacketType.ROTATE_KEY.getCode(),
-                    requestId.getBytes(StandardCharsets.UTF_8)
-            );
-
-            CompletableFuture<Packet> responseFuture = new CompletableFuture<>();
-            pendingResponses.put(requestId, responseFuture);
-
-            dispatcher.sendTo(chosenClientSession, rotationRequest);
-
-            Packet responsePacket = responseFuture.get(5, TimeUnit.SECONDS);
-
-            byte[] clientKeyHashBytes = extractKeyHashFromPayload(responsePacket.getPayload());
-            byte[] newKeyData = extractNewKeyFromPayload(responsePacket.getPayload());
-
-            if (!Arrays.equals(clientKeyHashBytes, trustedKeyHashFromDb)) {
-                throw new SecurityException(
-                        "MiTM attack detected! Client key hash does not match the database record."
-                );
+            dispatcher.sendTo(selected, new Packet(PacketType.ROTATE_KEY.getCode(),
+                    requestId.getBytes(StandardCharsets.US_ASCII)));
+            Packet reply = future.get(5, TimeUnit.SECONDS);
+            byte[] payload = reply.getPayload();
+            if (payload == null || payload.length != 72) {
+                throw new IllegalArgumentException("Rotation reply must contain request and version UUIDs.");
             }
+            UUID version = UUID.fromString(new String(payload, 36, 36, StandardCharsets.US_ASCII));
+            channelService.rotateChannelKey(channelId, version);
 
-            channelService.rotateChannelKey(channelId, newKeyData);
-
-            Packet ackPacket = new Packet(PacketType.MULTICAST_ROTATED_KEY.getCode(), newKeyData);
-            dispatcher.sendTo(chosenClientSession, ackPacket);
-
-            System.out.println("Key rotation completed successfully for channel: " + channelId);
-
+            // Only public version metadata is acknowledged. Clients distribute secrets E2EE.
+            dispatcher.sendTo(selected, new Packet(PacketType.MULTICAST_ROTATED_KEY.getCode(),
+                    version.toString().getBytes(StandardCharsets.US_ASCII)));
         } catch (Exception e) {
-            System.err.println("Error during key rotation process: " + e.getMessage());
+            System.err.println("Rotation metadata handshake failed for channel " + channelId + ": " + e.getMessage());
         } finally {
-            channelLockedFlags.put(channelId, false);
+            pendingResponses.remove(requestId);
+            channelLockedFlags.remove(channelId);
         }
     }
 
-    public void handleClientRotationResponse(String requestId, Packet responsePacket) {
-        CompletableFuture<Packet> future = pendingResponses.remove(requestId);
-        if (future != null) {
-            future.complete(responsePacket);
+    public void handleClientRotationResponse(String requestId, String senderUsername, Packet responsePacket) {
+        PendingRotation pending = pendingResponses.get(requestId);
+        if (pending != null && pending.username().equals(senderUsername)) {
+            pending.response().complete(responsePacket);
         }
     }
 
-    private WebSocketSession selectOldestOrRandomClient(Set<String> members) {
+    private WebSocketSession selectOnlineClient(Set<String> members) {
         for (String username : members) {
             WebSocketSession session = sessionRegistry.getSession(username);
             if (session != null && session.isOpen()) {
@@ -96,17 +89,5 @@ public class KeyRotationService {
             }
         }
         return null;
-    }
-
-    private byte[] extractKeyHashFromPayload(byte[] payload) {
-        byte[] hash = new byte[32];
-        System.arraycopy(payload, 0, hash, 0, 32);
-        return hash;
-    }
-
-    private byte[] extractNewKeyFromPayload(byte[] payload) {
-        byte[] key = new byte[payload.length - 32];
-        System.arraycopy(payload, 32, key, 0, key.length);
-        return key;
     }
 }

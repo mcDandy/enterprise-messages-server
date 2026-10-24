@@ -5,7 +5,7 @@ services:
       POSTGRES_DB: nnpro
       POSTGRES_USER: nnpro
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-    # No ports: PostgreSQL is accessible only on this Compose network.
+    # PostgreSQL stays on the internal Compose network (db:5432).
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
@@ -16,14 +16,18 @@ services:
       retries: 10
     restart: unless-stopped
 
-  adminer:
-    image: adminer:latest
-    profiles: ["tools"]
-    ports:
-      - "127.0.0.1:${ADMINER_PORT:-8081}:8080"
-    depends_on:
-      db:
-        condition: service_healthy
+  # Development-only certificate provisioning. Runs in Docker, not on the host.
+  # Existing private keys are always reused, never silently regenerated.
+  cert-init:
+    image: eclipse-temurin:21-jdk
+    environment:
+      TLS_HOST: ${TLS_HOST:-localhost}
+      TLS_KEYSTORE_PASSWORD: ${TLS_KEYSTORE_PASSWORD:?Set TLS_KEYSTORE_PASSWORD in .env}
+    volumes:
+      - ${TLS_CERTS_DIR:-./certs}:/certs
+      - ./scripts/ensure-dev-cert.sh:/opt/ems/ensure-dev-cert.sh:ro
+    entrypoint: ["/bin/sh", "/opt/ems/ensure-dev-cert.sh"]
+    restart: "no"
 
   backend:
     build:
@@ -43,14 +47,41 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
     volumes:
       - type: bind
-        source: ./certs/keystore.p12
-        target: /run/certs/keystore.p12
+        source: ${TLS_CERTS_DIR:-./certs}
+        target: /run/certs
         read_only: true
-        bind:
-          create_host_path: false
-    # Random host port; each backend instance gets its own published port.
+    # Use unique HTTPS_PORT and TLS_CERTS_DIR for each independent installation.
     ports:
-      - "8443"
+      - "${HTTPS_BIND_IP:-0.0.0.0}:${HTTPS_PORT:-8443}:8443"
+    depends_on:
+      db:
+        condition: service_healthy
+      cert-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  migrate:
+    image: postgres:17
+    profiles: ["migrate"]
+    environment:
+      PGHOST: db
+      PGDATABASE: nnpro
+      PGUSER: nnpro
+      PGPASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - ./database/migrations:/migrations:ro
+      - ./scripts/migrate-db.sh:/migrate-db.sh:ro
+    entrypoint: ["/bin/sh", "/migrate-db.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  adminer:
+    image: adminer:latest
+    profiles: ["tools"]
+    ports:
+      - "127.0.0.1:${ADMINER_PORT:-8081}:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -62,7 +93,7 @@ services:
       POSTGRES_DB: nnpro_test
       POSTGRES_USER: nnpro
       POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:-nnpro_local_test}
-    # Isolated, disposable database: NEVER the regular app's postgres_data.
+    # Never uses the application's postgres_data volume.
     tmpfs:
       - /var/lib/postgresql/data
     volumes:
@@ -72,8 +103,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    # Only for devs who run tests from IntelliJ on Windows
     ports:
-      - "127.0.0.1:55432:5432"
+      - "127.0.0.1:${TEST_DB_HOST_PORT:-55432}:5432"
 
   tests:
     profiles: ["test"]

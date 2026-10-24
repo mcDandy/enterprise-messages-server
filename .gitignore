@@ -49,3 +49,7 @@ certs/
 *.p12
 *.jks
 firebase-service-account.json
+
+# Private instance configurations
+.env.*
+!.env.example
