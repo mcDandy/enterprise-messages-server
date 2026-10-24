@@ -60,6 +60,23 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  migrate:
+    image: postgres:17
+    profiles: ["migrate"]
+    environment:
+      PGHOST: db
+      PGDATABASE: nnpro
+      PGUSER: nnpro
+      PGPASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - ./database/migrations:/migrations:ro
+      - ./scripts/migrate-db.sh:/migrate-db.sh:ro
+    entrypoint: ["/bin/sh", "/migrate-db.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
   adminer:
     image: adminer:latest
     profiles: ["tools"]

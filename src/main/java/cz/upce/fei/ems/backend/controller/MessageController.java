@@ -2,9 +2,7 @@ package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.domain.Message;
 import cz.upce.fei.ems.backend.dto.MessageResponseDto;
-import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
-import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.MessageRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -15,11 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.Principal;
 import java.util.List;
 
 @RestController
@@ -30,8 +25,6 @@ public class MessageController {
 
     private final MessageRepository messageRepository;
     private final ChannelKeyRepository channelKeyRepository;
-    private final ChannelMemberRepository channelMemberRepository;
-    private final AppUserRepository appUserRepository;
 
     @Operation(
             summary = "Get recent messages",
@@ -42,8 +35,7 @@ public class MessageController {
             }
     )
     @GetMapping("/recent")
-    public ResponseEntity<List<MessageResponseDto>> getRecentMessages(@PathVariable Long channelId, Principal principal) {
-        requireMember(channelId, principal);
+    public ResponseEntity<List<MessageResponseDto>> getRecentMessages(@PathVariable Long channelId) {
         List<MessageResponseDto> messages
                 = messageRepository.findTop50ByChannelIdOrderBySentAtDescIdDesc(channelId).stream()
                 .map(this::toDto)
@@ -60,30 +52,16 @@ public class MessageController {
             }
     )
     @GetMapping
-    public ResponseEntity<Slice<MessageResponseDto>> getMessagesPage(@PathVariable Long channelId, Pageable pageable, Principal principal) {
-        requireMember(channelId, principal);
+    public ResponseEntity<Slice<MessageResponseDto>> getMessagesPage(@PathVariable Long channelId, Pageable pageable) {
         Slice<MessageResponseDto> messageSlice = messageRepository.findByChannelId(channelId, pageable)
                 .map(this::toDto);
         return ResponseEntity.ok(messageSlice);
     }
-    // A channel member may read the ciphertext history, but an outsider must not.
-    private void requireMember(Long channelId, Principal principal) {
-        if (principal == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        }
-        var user = appUserRepository.findByUsername(principal.getName())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        if (!channelMemberRepository.existsByChannelIdAndUserId(channelId, user.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a member of this channel.");
-        }
-    }
-
     private MessageResponseDto toDto(Message message) {
-        var keyGeneration = channelKeyRepository.findById(message.getChannelKeyId())
-                .orElseThrow(() -> new IllegalStateException(
-                        "Missing channel key version for message " + message.getId()));
         MessageResponseDto dto = MessageResponseDto.fromEntity(message);
-        dto.setKeyVersion(keyGeneration.getVersion());
+        dto.setKeyVersion(channelKeyRepository.findById(message.getChannelKeyId())
+                .orElseThrow(() -> new IllegalStateException("Missing key version for message " + message.getId()))
+                .getVersion());
         return dto;
     }
 }
