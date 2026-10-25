@@ -32,10 +32,8 @@ public class ChannelService {
         return channelRepository.findByServerIdOrderByNameAsc(serverId);
     }
 
-    public Channel getChannelById(Long serverId, Long channelId) {
-        return channelRepository.findById(channelId)
-                .filter(channel -> channel.getServerId().equals(serverId))
-                .orElse(null);
+    public Channel getChannelById(Long channelId) {
+        return channelRepository.findById(channelId).orElse(null);
     }
 
     @Transactional
@@ -67,14 +65,14 @@ public class ChannelService {
     }
 
     @Transactional
-    public Channel updateChannel(Long serverId, Long channelId, UpdateChannelRequestDto request, String adminUsername) {
-        if (!serverService.isUserAdmin(serverId, adminUsername)) {
-            throw new SecurityException("Only server administrators can update channels.");
-        }
-
-        Channel channel = getChannelById(serverId, channelId);
+    public Channel updateChannel(Long channelId, UpdateChannelRequestDto request, String adminUsername) {
+        Channel channel = getChannelById(channelId);
         if (channel == null) {
             return null;
+        }
+
+        if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
+            throw new SecurityException("Only server administrators can update channels.");
         }
 
         channel.setName(request.getName());
@@ -82,13 +80,12 @@ public class ChannelService {
     }
 
     @Transactional
-    public void deleteChannel(Long serverId, Long channelId, String adminUsername) {
-        if (!serverService.isUserAdmin(serverId, adminUsername)) {
-            throw new SecurityException("Only server administrators can delete channels.");
-        }
-
-        Channel channel = getChannelById(serverId, channelId);
+    public void deleteChannel(Long channelId, String adminUsername) {
+        Channel channel = getChannelById(channelId);
         if (channel != null) {
+            if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
+                throw new SecurityException("Only server administrators can delete channels.");
+            }
             channelRepository.delete(channel);
         }
     }

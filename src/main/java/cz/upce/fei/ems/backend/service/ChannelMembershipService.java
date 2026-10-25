@@ -1,10 +1,12 @@
 package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.AppUser;
+import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.domain.ChannelMember;
 import cz.upce.fei.ems.backend.domain.ChannelMemberId;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
+import cz.upce.fei.ems.backend.repository.ChannelRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,14 +19,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChannelMembershipService {
 
+    private final ChannelRepository channelRepository;
     private final ChannelMemberRepository channelMemberRepository;
     private final AppUserRepository appUserRepository;
     private final MessageServerService serverService;
     private final KeyRotationService keyRotationService;
 
     @Transactional
-    public void addMemberToChannel(Long serverId, Long channelId, Long targetUserId, String adminUsername) {
-        if (!serverService.isUserAdmin(serverId, adminUsername)) {
+    public void addMemberToChannel(Long channelId, Long targetUserId, String adminUsername) {
+        Channel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found"));
+
+        if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
             throw new SecurityException("Only server administrators can manage channel memberships.");
         }
 
@@ -46,8 +52,11 @@ public class ChannelMembershipService {
     }
 
     @Transactional
-    public void removeMemberFromChannel(Long serverId, Long channelId, Long targetUserId, String adminUsername) {
-        if (!serverService.isUserAdmin(serverId, adminUsername)) {
+    public void removeMemberFromChannel(Long channelId, Long targetUserId, String adminUsername) {
+        Channel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found"));
+
+        if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
             throw new SecurityException("Only server administrators can manage channel memberships.");
         }
 

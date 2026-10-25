@@ -4,7 +4,6 @@ import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.dto.ChannelResponseDto;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
-import cz.upce.fei.ems.backend.dto.UserKeyResponseDto;
 import cz.upce.fei.ems.backend.service.ChannelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -21,7 +20,6 @@ import java.security.Principal;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/servers/{serverId}/channels")
 @RequiredArgsConstructor
 @Tag(name = "Channels", description = "Channel CRUD operations and management")
 public class ChannelController {
@@ -29,14 +27,14 @@ public class ChannelController {
     private final ChannelService channelService;
 
     @Operation(
-            summary = "Get channels",
+            summary = "Get channels by server",
             description = "Lists all channels belonging to the server.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "List of channels retrieved successfully",
                             content = @Content(schema = @Schema(implementation = ChannelResponseDto.class)))
             }
     )
-    @GetMapping
+    @GetMapping("/api/servers/{serverId}/channels")
     public ResponseEntity<List<ChannelResponseDto>> getChannels(@PathVariable Long serverId) {
         List<ChannelResponseDto> channels = channelService.getChannelsByServerId(serverId).stream()
                 .map(ChannelResponseDto::fromEntity)
@@ -53,9 +51,9 @@ public class ChannelController {
                     @ApiResponse(responseCode = "404", description = "Channel not found", content = @Content)
             }
     )
-    @GetMapping("/{channelId}")
-    public ResponseEntity<ChannelResponseDto> getChannel(@PathVariable Long serverId, @PathVariable Long channelId) {
-        Channel channel = channelService.getChannelById(serverId, channelId);
+    @GetMapping("/api/channels/{channelId}")
+    public ResponseEntity<ChannelResponseDto> getChannel(@PathVariable Long channelId) {
+        Channel channel = channelService.getChannelById(channelId);
         if (channel == null) {
             return ResponseEntity.notFound().build();
         }
@@ -73,7 +71,7 @@ public class ChannelController {
                     @ApiResponse(responseCode = "409", description = "Channel name already exists", content = @Content)
             }
     )
-    @PostMapping
+    @PostMapping("/api/servers/{serverId}/channels")
     public ResponseEntity<ChannelResponseDto> createChannel(
             @PathVariable Long serverId,
             @Valid @RequestBody CreateChannelRequestDto request,
@@ -99,15 +97,14 @@ public class ChannelController {
                     @ApiResponse(responseCode = "404", description = "Channel not found", content = @Content)
             }
     )
-    @PutMapping("/{channelId}")
+    @PutMapping("/api/channels/{channelId}")
     public ResponseEntity<ChannelResponseDto> updateChannel(
-            @PathVariable Long serverId,
             @PathVariable Long channelId,
             @Valid @RequestBody UpdateChannelRequestDto request,
             Principal principal) {
 
         try {
-            Channel updatedChannel = channelService.updateChannel(serverId, channelId, request, principal.getName());
+            Channel updatedChannel = channelService.updateChannel(channelId, request, principal.getName());
             if (updatedChannel == null) {
                 return ResponseEntity.notFound().build();
             }
@@ -119,21 +116,20 @@ public class ChannelController {
 
     @Operation(
             summary = "Delete channel",
-            description = "Deletes a channel from the server (Admin only).",
+            description = "Deletes a channel (Admin only).",
             responses = {
                     @ApiResponse(responseCode = "204", description = "Channel deleted successfully"),
                     @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content),
                     @ApiResponse(responseCode = "404", description = "Channel not found", content = @Content)
             }
     )
-    @DeleteMapping("/{channelId}")
+    @DeleteMapping("/api/channels/{channelId}")
     public ResponseEntity<Void> deleteChannel(
-            @PathVariable Long serverId,
             @PathVariable Long channelId,
             Principal principal) {
 
         try {
-            channelService.deleteChannel(serverId, channelId, principal.getName());
+            channelService.deleteChannel(channelId, principal.getName());
             return ResponseEntity.noContent().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -149,7 +145,7 @@ public class ChannelController {
                             content = @Content(schema = @Schema(implementation = ChannelResponseDto.class)))
             }
     )
-    @GetMapping("/my")
+    @GetMapping("/api/servers/{serverId}/channels/my")
     public ResponseEntity<List<ChannelResponseDto>> getMyChannelsForServer(
             @PathVariable Long serverId,
             Principal principal) {

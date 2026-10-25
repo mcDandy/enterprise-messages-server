@@ -18,7 +18,7 @@ import java.security.Principal;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/servers/{serverId}/channels/{channelId}/members")
+@RequestMapping("/api/channels/{channelId}/members")
 @RequiredArgsConstructor
 @Tag(name = "Channel Memberships", description = "Managing members inside specific channels")
 public class ChannelMembershipController {
@@ -35,9 +35,7 @@ public class ChannelMembershipController {
             }
     )
     @GetMapping
-    public ResponseEntity<List<ChannelMemberResponseDto>> getChannelMembers(
-            @PathVariable Long serverId,
-            @PathVariable Long channelId) {
+    public ResponseEntity<List<ChannelMemberResponseDto>> getChannelMembers(@PathVariable Long channelId) {
         List<ChannelMemberResponseDto> members = channelMemberRepository.findByChannelId(channelId).stream()
                 .map(ChannelMemberResponseDto::fromEntity)
                 .toList();
@@ -50,16 +48,16 @@ public class ChannelMembershipController {
             responses = {
                     @ApiResponse(responseCode = "200", description = "Member added to channel successfully"),
                     @ApiResponse(responseCode = "400", description = "Invalid request data", content = @Content),
-                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content)
+                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content),
+                    @ApiResponse(responseCode = "404", description = "Channel or user not found", content = @Content)
             }
     )
     @PostMapping
     public ResponseEntity<Void> addMemberToChannel(
-            @PathVariable Long serverId,
             @PathVariable Long channelId,
             @Valid @RequestBody AddChannelMemberRequestDto request,
             Principal principal) {
-        channelMembershipService.addMemberToChannel(serverId, channelId, request.getUserId(), principal.getName());
+        channelMembershipService.addMemberToChannel(channelId, request.getUserId(), principal.getName());
         return ResponseEntity.ok().build();
     }
 
@@ -74,11 +72,10 @@ public class ChannelMembershipController {
     )
     @DeleteMapping("/{userId}")
     public ResponseEntity<Void> removeMemberFromChannel(
-            @PathVariable Long serverId,
             @PathVariable Long channelId,
             @PathVariable Long userId,
             Principal principal) {
-        channelMembershipService.removeMemberFromChannel(serverId, channelId, userId, principal.getName());
+        channelMembershipService.removeMemberFromChannel(channelId, userId, principal.getName());
         return ResponseEntity.noContent().build();
     }
 }
