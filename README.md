@@ -16,6 +16,34 @@ Starts PostgreSQL, creates a development TLS certificate on first run and
 starts the backend at `https://localhost:8443`. Logs:
 `docker compose logs -f backend`.
 
+## Development mode: hot reload and demo data
+
+Use the same `.env` as for normal Docker startup. To enable Java live reload
+and automatic demo data, run this from the repository root:
+
+```powershell
+docker compose -f compose.yaml -f compose.dev.yaml --profile dev up --build --watch
+```
+
+The development override keeps the same backend, HTTPS/WSS and PostgreSQL
+configuration. It runs `bootRun`, automatically recompiles changed Java files
+using `dev-compiler`, and restarts Spring Boot through DevTools without rebuilding
+the Docker image. Keep the terminal open while editing code.
+
+The one-shot `dev-seed` service automatically creates `demo_alice`, `demo_bob`
+and `demo_carol` (password `DevTest123!`), one server and three channels with
+memberships. It is safe to rerun without duplicates, but it does not create
+E2EE keys; clients register their own keys. **Never use this dev override for
+production.** Normal `docker compose up` does not insert demo accounts.
+
+Without `-p`, development and normal Compose in the same checkout share the
+same persistent database volume. Do not point this at a database you need to
+keep free of demo data. For a second isolated installation with its own DB,
+container names, HTTPS port and certificates, see [DEV_DOCKER.md](DEV_DOCKER.md).
+
+Automated tests continue to use the isolated `db-test` service and do not
+require the dev override.
+
 ## Tests
 
 ```sh

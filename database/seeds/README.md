@@ -4,6 +4,25 @@
 
 Accounts: `demo_alice`, `demo_bob`, `demo_carol` (password `DevTest123!`). Passwords are BCrypt hashes. **Do not run this seed against a production database.** It does not create `user_key` entries or usable E2EE key pairs; clients must register their own keys for actual encrypted messaging.
 
+## Automatic development seed
+
+When using `compose.dev.yaml`, a one-shot `dev-seed` service automatically
+imports this SQL file into the **development** `db` once PostgreSQL is healthy
+and before the backend starts. It also works if the development database
+already has a persistent volume. Existing demo records are preserved because
+this SQL script can be run repeatedly.
+
+```powershell
+docker compose -p nnpro-hotdev -f compose.yaml -f compose.dev.yaml --profile dev up -d dev-seed
+```
+
+The command above runs the seed and database without starting the full Java
+backend. For the complete dev environment use the documented `compose.dev.yaml`
+startup command. **Normal `compose.yaml` deployments are not seeded.** Never
+use this dev override against a production database.
+
+## Manual seed on isolated test database
+
 From the project root, with Docker Compose and a configured `.env`, use a separate temporary test database:
 
 ```powershell
