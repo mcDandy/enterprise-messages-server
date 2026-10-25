@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -49,10 +48,6 @@ public class UserService {
 
     public Optional<UserKey> getActivePublicKeyForUser(Long userId) {
         return userKeyRepository.findByUserIdAndRevokedAtIsNull(userId);
-    }
-
-    public Optional<UserKey> getActivePublicKeysBatch(List<Long> userIds) {
-        return userKeyRepository.findByUserIdInAndRevokedAtIsNull(userIds);
     }
 
     public UserResponseDto mapToUserResponse(AppUser user) {

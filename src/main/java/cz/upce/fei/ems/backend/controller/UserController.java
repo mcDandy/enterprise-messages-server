@@ -1,7 +1,5 @@
 package cz.upce.fei.ems.backend.controller;
 
-import cz.upce.fei.ems.backend.domain.AppUser;
-import cz.upce.fei.ems.backend.domain.UserKey;
 import cz.upce.fei.ems.backend.dto.*;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.service.UserService;
@@ -16,7 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/users")
@@ -86,21 +83,4 @@ public class UserController {
                 .map(key -> ResponseEntity.ok(userService.mapToKeyResponse(key)))
                 .orElse(ResponseEntity.notFound().build());
     }
-
-    @Operation(
-            summary = "Get active public keys for multiple users in batch",
-            responses = {
-                    @ApiResponse(responseCode = "200", description = "Keys retrieved successfully",
-                            content = @Content(schema = @Schema(implementation = UserKeyResponseDto.class))),
-                    @ApiResponse(responseCode = "404", description = "Key not found", content = @Content)
-            }
-    )
-    @PostMapping("/keys/batch")
-    public ResponseEntity<UserKeyResponseDto> getBatchPublicKeys(@Valid @RequestBody BatchKeysRequestDto request) {
-        return userService.getActivePublicKeysBatch(request.getUserIds())
-                .map(userService::mapToKeyResponse)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
 }

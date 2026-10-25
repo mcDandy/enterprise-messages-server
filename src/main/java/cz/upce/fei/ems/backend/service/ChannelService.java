@@ -3,17 +3,17 @@ package cz.upce.fei.ems.backend.service;
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.domain.ChannelMember;
+import cz.upce.fei.ems.backend.domain.UserKey;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
-import cz.upce.fei.ems.backend.repository.AppUserRepository;
-import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
-import cz.upce.fei.ems.backend.repository.ChannelRepository;
-import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
+import cz.upce.fei.ems.backend.dto.UserKeyResponseDto;
+import cz.upce.fei.ems.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -26,6 +26,7 @@ public class ChannelService {
     private final ServerMemberRepository serverMemberRepository;
     private final MessageServerService serverService;
     private final KeyRotationService keyRotationService;
+    private final UserKeyRepository userKeyRepository;
 
     public List<Channel> getChannelsByServerId(Long serverId) {
         return channelRepository.findByServerIdOrderByNameAsc(serverId);
@@ -90,6 +91,25 @@ public class ChannelService {
         if (channel != null) {
             channelRepository.delete(channel);
         }
+    }
+
+    public List<UserKeyResponseDto> getActivePublicKeysForChannel(Long channelId) {
+        List<Long> userIds = channelMemberRepository.findByChannelId(channelId).stream()
+                .map(ChannelMember::getUserId)
+                .toList();
+
+        return userIds.stream()
+                .map(userId -> userKeyRepository.findByUserIdAndRevokedAtIsNull(userId).orElse(null))
+                .filter(Objects::nonNull)
+                .map(this::mapToKeyResponse)
+                .toList();
+    }
+
+    private UserKeyResponseDto mapToKeyResponse(UserKey userKey) {
+        return UserKeyResponseDto.builder()
+                .id(userKey.getId())
+                .publicKey(userKey.getPublicKey())
+                .build();
     }
 
     public List<Channel> getMyChannelsForServer(Long serverId, String username) {

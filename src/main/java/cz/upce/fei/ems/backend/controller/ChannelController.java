@@ -4,6 +4,7 @@ import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.dto.ChannelResponseDto;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
+import cz.upce.fei.ems.backend.dto.UserKeyResponseDto;
 import cz.upce.fei.ems.backend.service.ChannelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -162,5 +163,19 @@ public class ChannelController {
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
+    }
+
+    @Operation(
+            summary = "Get active public keys for all peers in a channel",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Keys retrieved successfully",
+                            content = @Content(schema = @Schema(implementation = UserKeyResponseDto.class))),
+                    @ApiResponse(responseCode = "404", description = "Channel not found", content = @Content)
+            }
+    )
+    @GetMapping("/{channelId}/keys")
+    public ResponseEntity<List<UserKeyResponseDto>> getChannelMemberPublicKeys(@PathVariable Long channelId) {
+        List<UserKeyResponseDto> keys = channelService.getActivePublicKeysForChannel(channelId);
+        return ResponseEntity.ok(keys);
     }
 }
