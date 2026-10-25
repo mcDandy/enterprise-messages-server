@@ -2,6 +2,7 @@ package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.ChannelMember;
+import cz.upce.fei.ems.backend.domain.ChannelMemberId;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -50,11 +51,12 @@ public class ChannelMembershipService {
             throw new SecurityException("Only server administrators can manage channel memberships.");
         }
 
-        channelMemberRepository.findById(new cz.upce.fei.ems.backend.domain.ChannelMemberId(channelId, targetUserId))
-                .ifPresent(member -> {
-                    channelMemberRepository.delete(member);
-                    triggerKeyRotation(channelId);
-                });
+        ChannelMemberId memberId = new ChannelMemberId(channelId, targetUserId);
+        ChannelMember member = channelMemberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("Channel member not found"));
+
+        channelMemberRepository.delete(member);
+        triggerKeyRotation(channelId);
     }
 
     private void triggerKeyRotation(Long channelId) {
