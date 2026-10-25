@@ -164,18 +164,4 @@ public class ChannelController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
     }
-
-    @Operation(
-            summary = "Get active public keys for all peers in a channel",
-            responses = {
-                    @ApiResponse(responseCode = "200", description = "Keys retrieved successfully",
-                            content = @Content(schema = @Schema(implementation = UserKeyResponseDto.class))),
-                    @ApiResponse(responseCode = "404", description = "Channel not found", content = @Content)
-            }
-    )
-    @GetMapping("/{channelId}/keys")
-    public ResponseEntity<List<UserKeyResponseDto>> getChannelMemberPublicKeys(@PathVariable Long channelId) {
-        List<UserKeyResponseDto> keys = channelService.getActivePublicKeysForChannel(channelId);
-        return ResponseEntity.ok(keys);
-    }
 }
