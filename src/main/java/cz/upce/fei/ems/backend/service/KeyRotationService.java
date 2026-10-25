@@ -56,7 +56,7 @@ public class KeyRotationService {
 
             String requestId = UUID.randomUUID().toString();
 
-            String payloadPayload = requestId + ":" + channelId;
+            String payloadPayload = requestId + channelId;
 
             log.info("Initiating key rotation for channel {} using client: {} (requestId: {})",
                     channelId, selected.getAttributes().get("username"), requestId);
