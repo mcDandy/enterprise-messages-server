@@ -1,20 +1,64 @@
-
+# Development-only overrides: the regular compose.yaml remains unchanged.
+# Run with: docker compose -f compose.yaml -f compose.dev.yaml --profile dev up --build --watch
 services:
   backend:
     build:
       target: build
-
     environment:
-      GRADLE_USER_HOME: /gradle-home
+      GRADLE_USER_HOME: /gradle-backend-home
       DB_URL: jdbc:postgresql://db:5432/nnpro
-
+      SPRING_DEVTOOLS_RESTART_ENABLED: "true"
     command: ["./gradlew", "bootRun", "--no-daemon"]
-
+    depends_on:
+      # Compose waits for demo data before starting the Spring application.
+      dev-seed:
+        condition: service_completed_successfully
     volumes:
       - ./src:/app/src:ro
       - ./build.gradle:/app/build.gradle:ro
       - ./settings.gradle:/app/settings.gradle:ro
+      - dev_gradle_backend_home:/gradle-backend-home
+      # The compiler writes updated .class files here; DevTools observes them.
+      - dev_build:/app/build
+
+  # Development-only: import repeatable demo data on startup, including on
+  # an existing database volume. No effect on normal compose.yaml deployments.
+  dev-seed:
+    image: postgres:17
+    environment:
+      PGPASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - ./database/seeds/dev_seed.sql:/seed/dev_seed.sql:ro
+    entrypoint: ["psql", "-X", "-v", "ON_ERROR_STOP=1", "-h", "db", "-U", "nnpro", "-d", "nnpro", "-f", "/seed/dev_seed.sql"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # Runs only with --profile dev. Sources are synced by Compose Watch into
+  # this container, producing Linux-side filesystem events for Gradle.
+  dev-compiler:
+    profiles: ["dev"]
+    build:
+      context: .
+      target: build
+    environment:
+      GRADLE_USER_HOME: /gradle-home
+    # Continuous Gradle builds need the daemon and filesystem watching.
+    command: ["./gradlew", "classes", "--continuous"]
+    volumes:
+      - ./build.gradle:/app/build.gradle:ro
+      - ./settings.gradle:/app/settings.gradle:ro
       - dev_gradle_home:/gradle-home
+      - dev_build:/app/build
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+          initial_sync: true
 
 volumes:
   dev_gradle_home:
+  dev_gradle_backend_home:
+  dev_build:
