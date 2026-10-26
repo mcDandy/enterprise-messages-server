@@ -12,8 +12,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -63,8 +66,9 @@ public class AuthController {
             summary = "Get User Public Key",
             description = "Returns the public E2EE key for a given user so the sender can encrypt a message for them."
     )
-    @GetMapping("/public-key/{username}")
-    public ResponseEntity<String> getPublicKey(@PathVariable String username) {
-        return ResponseEntity.ok(authService.getPublicKey(username));
+    @GetMapping(value = "/public-key/{username}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, String>> getPublicKey(@PathVariable String username) {
+        String publicKey = authService.getPublicKey(username);
+        return ResponseEntity.ok(Map.of("publicKey", publicKey));
     }
 }
