@@ -27,8 +27,12 @@ public class ChannelService {
     private final MessageServerService serverService;
     private final KeyRotationService keyRotationService;
     private final UserKeyRepository userKeyRepository;
+    private final MessageServerRepository messageServerRepository;
 
     public List<Channel> getChannelsByServerId(Long serverId) {
+        if (!messageServerRepository.existsById(serverId)) {
+            return null;
+        }
         return channelRepository.findByServerIdOrderByNameAsc(serverId);
     }
 

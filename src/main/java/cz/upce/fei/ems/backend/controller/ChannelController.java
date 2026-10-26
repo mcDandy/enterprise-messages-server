@@ -31,15 +31,21 @@ public class ChannelController {
             description = "Lists all channels belonging to the server.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "List of channels retrieved successfully",
-                            content = @Content(schema = @Schema(implementation = ChannelResponseDto.class)))
+                            content = @Content(schema = @Schema(implementation = ChannelResponseDto.class))),
+                    @ApiResponse(responseCode = "404", description = "Server not found", content = @Content)
             }
     )
     @GetMapping("/api/servers/{serverId}/channels")
     public ResponseEntity<List<ChannelResponseDto>> getChannels(@PathVariable Long serverId) {
-        List<ChannelResponseDto> channels = channelService.getChannelsByServerId(serverId).stream()
+        List<Channel> channels = channelService.getChannelsByServerId(serverId);
+        if (channels == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        List<ChannelResponseDto> channelDtos = channels.stream()
                 .map(ChannelResponseDto::fromEntity)
                 .toList();
-        return ResponseEntity.ok(channels);
+        return ResponseEntity.ok(channelDtos);
     }
 
     @Operation(
