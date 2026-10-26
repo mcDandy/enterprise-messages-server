@@ -14,7 +14,6 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -29,14 +28,9 @@ public class KeyRotationService {
     private final ChannelKeyPendingRepository channelKeyPendingRepository;
     private final ChannelRotationPendingRepository channelRotationPendingRepository;
 
-    private final Map<Long, Boolean> channelLockedFlags = new ConcurrentHashMap<>();
 
     @Transactional
     public void solicitateNewKeyRotation(Long channelId, Set<String> currentChannelMembers) {
-        if (channelLockedFlags.putIfAbsent(channelId, true) != null) {
-            log.warn("Rotation is already in progress for channel {}", channelId);
-            return;
-        }
         try {
             WebSocketSession selected = selectOnlineClient(currentChannelMembers);
             if (selected == null) {
@@ -48,7 +42,6 @@ public class KeyRotationService {
                     channelRotationPendingRepository.save(pending);
                 }
 
-                channelLockedFlags.remove(channelId);
                 return;
             }
 
@@ -70,7 +63,6 @@ public class KeyRotationService {
             ));
         } catch (Exception e) {
             log.error("Failed to send rotation solicitation for channel {}: {}", channelId, e.getMessage(), e);
-            channelLockedFlags.remove(channelId);
         }
     }
 
@@ -125,8 +117,6 @@ public class KeyRotationService {
         } catch (Exception e) {
             log.error("Failed to process unicast key rotation ciphertext from user {} to user {}: {}",
                     senderUsername, recipientUserId, e.getMessage(), e);
-        } finally {
-            channelLockedFlags.remove(channelId);
         }
     }
 
