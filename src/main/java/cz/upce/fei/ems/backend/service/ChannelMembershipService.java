@@ -46,6 +46,7 @@ public class ChannelMembershipService {
             MessageServerMember serverMember = new MessageServerMember();
             serverMember.setServerId(channel.getServerId());
             serverMember.setUserId(targetUserId);
+            serverMember.setRole(MessageServerRole.MEMBER);
             serverMemberRepository.save(serverMember);
         }
 
