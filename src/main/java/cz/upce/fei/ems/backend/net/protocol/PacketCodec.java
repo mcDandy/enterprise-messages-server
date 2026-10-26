@@ -15,7 +15,6 @@ public class PacketCodec {
         ByteBuffer buffer = ByteBuffer.allocate(TYPE_FIELD_SIZE + payloadLength);
 
         buffer.put(packet.getType());
-        buffer.putInt(payloadLength);
 
         if (payloadLength > 0) {
             buffer.put(packet.getPayload());
