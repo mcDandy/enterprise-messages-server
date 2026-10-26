@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.WebSocketSession;
 
-import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -54,16 +54,19 @@ public class KeyRotationService {
 
             channelRotationPendingRepository.deleteByChannelId(channelId);
 
-            String requestId = UUID.randomUUID().toString();
+            UUID requestId = UUID.randomUUID();
 
-            String payloadPayload = requestId + channelId;
+            ByteBuffer buffer = ByteBuffer.allocate(24);
+            buffer.putLong(requestId.getMostSignificantBits());
+            buffer.putLong(requestId.getLeastSignificantBits());
+            buffer.putLong(channelId);
 
             log.info("Initiating key rotation for channel {} using client: {} (requestId: {})",
                     channelId, selected.getAttributes().get("username"), requestId);
 
             dispatcher.sendTo(selected, new Packet(
                     PacketType.ROTATE_KEY.getCode(),
-                    payloadPayload.getBytes(StandardCharsets.US_ASCII)
+                    buffer.array()
             ));
         } catch (Exception e) {
             log.error("Failed to send rotation solicitation for channel {}: {}", channelId, e.getMessage(), e);
