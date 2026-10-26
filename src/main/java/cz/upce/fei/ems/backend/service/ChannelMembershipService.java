@@ -1,12 +1,10 @@
 package cz.upce.fei.ems.backend.service;
 
-import cz.upce.fei.ems.backend.domain.AppUser;
-import cz.upce.fei.ems.backend.domain.Channel;
-import cz.upce.fei.ems.backend.domain.ChannelMember;
-import cz.upce.fei.ems.backend.domain.ChannelMemberId;
+import cz.upce.fei.ems.backend.domain.*;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.ChannelRepository;
+import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +22,8 @@ public class ChannelMembershipService {
     private final AppUserRepository appUserRepository;
     private final MessageServerService serverService;
     private final KeyRotationService keyRotationService;
+    private final ServerMemberRepository serverMemberRepository;
+
 
     @Transactional
     public void addMemberToChannel(Long channelId, Long targetUserId, String adminUsername) {
@@ -40,6 +40,13 @@ public class ChannelMembershipService {
 
         if (channelMemberRepository.existsByChannelIdAndUserId(channelId, targetUserId)) {
             throw new IllegalStateException("User is already a member of this channel.");
+        }
+
+        if (!serverMemberRepository.existsByServerIdAndUserId(channel.getServerId(), targetUserId)) {
+            MessageServerMember serverMember = new MessageServerMember();
+            serverMember.setServerId(channel.getServerId());
+            serverMember.setUserId(targetUserId);
+            serverMemberRepository.save(serverMember);
         }
 
         ChannelMember member = new ChannelMember();
