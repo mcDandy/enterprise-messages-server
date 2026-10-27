@@ -1,14 +1,17 @@
 package cz.upce.fei.ems.backend.net.handler;
 
+import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
+import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.service.KeyRotationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -16,6 +19,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
 
     private final PacketDispatcher dispatcher;
     private final KeyRotationService keyRotationService;
+    private final AppUserRepository appUserRepository;
 
     @Override
     public PacketType getSupportedType() {
@@ -29,11 +33,13 @@ public class UnicastKeyRotationHandler implements PacketHandler {
             dispatcher.sendError(session, "Invalid unicast rotation payload.");
             return;
         }
-
+        AppUser appUser;
         String senderUsername = (String) session.getAttributes().get("username");
-        if (senderUsername == null) {
+        if (senderUsername == null || appUserRepository.findByUsername(senderUsername).isEmpty()) {
             dispatcher.sendError(session, "Unauthorized connection.");
             return;
+        } else {
+            appUser = appUserRepository.findByUsername(senderUsername).get();
         }
 
         Long channelId = (Long) session.getAttributes().get("currentChannelId");
@@ -46,6 +52,12 @@ public class UnicastKeyRotationHandler implements PacketHandler {
         ByteBuffer buffer = ByteBuffer.wrap(payload);
         long recipientUserId = buffer.getLong();
         byte[] ciphertext = new byte[buffer.remaining()];
+
+        if (appUser.getId() == recipientUserId) {
+            dispatcher.sendError(session, "You are sending key to yourself");
+            return;
+        }
+
         keyRotationService.handleClientUnicastRotation(channelId, senderUsername, recipientUserId, ciphertext, newPacket);
     }
 }
