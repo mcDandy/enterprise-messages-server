@@ -24,6 +24,12 @@ public class UnicastKeyRotationHandler implements PacketHandler {
 
     @Override
     public void handle(WebSocketSession session, Packet packet) throws Exception {
+        byte[] payload = packet.getPayload();
+        if (payload == null || payload.length < 1) {
+            dispatcher.sendError(session, "Invalid unicast rotation payload.");
+            return;
+        }
+
         String senderUsername = (String) session.getAttributes().get("username");
         if (senderUsername == null) {
             dispatcher.sendError(session, "Unauthorized connection.");
@@ -36,15 +42,10 @@ public class UnicastKeyRotationHandler implements PacketHandler {
             return;
         }
 
-        byte[] payload = packet.getPayload();
-        if (payload == null || payload.length < 9) {
-            dispatcher.sendError(session, "Invalid unicast rotation payload.");
-            return;
-        }
-
+        Packet newPacket = new Packet(PacketType.UNICAST_KEY_ROTATION.getCode(), payload);
         ByteBuffer buffer = ByteBuffer.wrap(payload);
         long recipientUserId = buffer.getLong();
         byte[] ciphertext = new byte[buffer.remaining()];
-        keyRotationService.handleClientUnicastRotation(channelId, senderUsername, recipientUserId, ciphertext, packet);
+        keyRotationService.handleClientUnicastRotation(channelId, senderUsername, recipientUserId, ciphertext, newPacket);
     }
 }

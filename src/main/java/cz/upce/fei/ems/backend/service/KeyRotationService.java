@@ -83,7 +83,7 @@ public class KeyRotationService {
 
     @Transactional
     public void handleClientUnicastRotation(
-            Long channelId, String senderUsername, Long recipientUserId, byte[] ciphertext, Packet originalPacket
+            Long channelId, String senderUsername, Long recipientUserId, byte[] ciphertext, Packet packet
     ) {
         UUID newVersionUuid = UUID.randomUUID();
         ChannelKey channelKey = new ChannelKey();
@@ -99,7 +99,7 @@ public class KeyRotationService {
             if (recipientUser != null) {
                 WebSocketSession recipientSession = sessionRegistry.getSession(recipientUser.getUsername());
                 if (recipientSession != null && recipientSession.isOpen()) {
-                    dispatcher.sendTo(recipientSession, originalPacket);
+                    dispatcher.sendTo(recipientSession, packet);
                     log.debug("Forwarded unicast key rotation ciphertext to online user ID {}", recipientUserId);
                 } else {
                     ChannelKeyPending pending = new ChannelKeyPending();
