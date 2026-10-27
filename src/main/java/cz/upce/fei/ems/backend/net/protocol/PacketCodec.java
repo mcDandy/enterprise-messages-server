@@ -26,13 +26,6 @@ public class PacketCodec {
 
     public Packet decode(ByteBuffer buffer) {
         byte type = buffer.get();
-        int payloadLength = buffer.getInt();
-
-        byte[] payload = new byte[payloadLength];
-        if (payloadLength > 0) {
-            buffer.get(payload);
-        }
-
-        return new Packet(type, payload);
+        return new Packet(type, buffer.array());
     }
 }
