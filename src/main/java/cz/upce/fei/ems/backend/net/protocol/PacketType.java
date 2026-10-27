@@ -8,9 +8,9 @@ import lombok.RequiredArgsConstructor;
 public enum PacketType {
 
     UNKNOWN((byte) 0x00),
-    CHAT_MESSAGE_ENC((byte) 0x02),
+    CHAT_MESSAGE_ENC((byte) 0x01),
     ROTATE_KEY((byte) 0x0a),
-    UNICAST_KEY_ROTATION((byte) 0x0b);
+    UNICAST_KEY_ROTATION((byte) 0x0d);
 
     private final byte code;
 
