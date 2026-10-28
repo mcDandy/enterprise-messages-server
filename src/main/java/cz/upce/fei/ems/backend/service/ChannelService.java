@@ -94,10 +94,11 @@ public class ChannelService {
         }
     }
 
-    public List<UserKeyResponseDto> getActivePublicKeysForChannel(Long channelId) {
-        List<Long> userIds = channelMemberRepository.findByChannelId(channelId).stream()
+    public List<UserKeyResponseDto> getActivePublicKeysForChannel(Long channelId, String username) {
+        List<Long> userIds = new java.util.ArrayList<>(channelMemberRepository.findByChannelId(channelId).stream()
                 .map(ChannelMember::getUserId)
-                .toList();
+                .toList());
+        appUserRepository.findByUsername(username).ifPresent(user -> userIds.remove(user.getId()));
 
         return userIds.stream()
                 .map(userId -> userKeyRepository.findByUserIdAndRevokedAtIsNull(userId).orElse(null))

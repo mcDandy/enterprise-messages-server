@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 
 @RestController
@@ -20,7 +21,7 @@ public class ChannelMemberPublicKeysController {
 
     private final ChannelService channelService;
     @Operation(
-            summary = "Get active public keys for all peers in a channel",
+            summary = "Get active public keys for all peers in a channel, key of token owner will not be included",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Keys retrieved successfully",
                             content = @Content(schema = @Schema(implementation = UserKeyResponseDto.class))),
@@ -28,8 +29,11 @@ public class ChannelMemberPublicKeysController {
             }
     )
     @GetMapping("/api/channels/{chId}/keys")
-    public ResponseEntity<List<UserKeyResponseDto>> getChannelMemberPublicKeys(@PathVariable Long chId) {
-        List<UserKeyResponseDto> keys = channelService.getActivePublicKeysForChannel(chId);
+    public ResponseEntity<List<UserKeyResponseDto>> getChannelMemberPublicKeys(
+            @PathVariable Long chId,
+            Principal principal
+    ) {
+        List<UserKeyResponseDto> keys = channelService.getActivePublicKeysForChannel(chId, principal.getName());
         return ResponseEntity.ok(keys);
     }
 }
