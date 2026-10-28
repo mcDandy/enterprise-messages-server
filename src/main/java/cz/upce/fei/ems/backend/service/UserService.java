@@ -33,13 +33,13 @@ public class UserService {
         AppUser user = appUserRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // Revoke current active public key
         userKeyRepository.findByUserIdAndRevokedAtIsNull(user.getId()).ifPresent(oldKey -> {
             oldKey.setRevokedAt(OffsetDateTime.now());
             userKeyRepository.save(oldKey);
         });
 
-        // Register new active public key
+        userKeyRepository.flush();
+
         UserKey key = new UserKey();
         key.setUserId(user.getId());
         key.setPublicKey(newPublicKey);
