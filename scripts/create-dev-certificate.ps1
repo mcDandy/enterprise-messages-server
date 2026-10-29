@@ -37,7 +37,7 @@ if ($LASTEXITCODE -ne 0) { throw "keytool failed" }
 Write-Host "Certificate created at $keystore"
 Write-Host "Exporting the public certificate (without private key)..."
 & $keytool -exportcert -rfc -alias ems-backend -keystore $keystore `
-    -file (Join-Path $certDir "dev-server.crt")
+    -file (Join-Path $certDir "certificate.pem")
 if ($LASTEXITCODE -ne 0) { throw "Failed to export the public certificate" }
-Write-Host "Public certificate: $(Join-Path $certDir 'dev-server.crt')"
+Write-Host "Public certificate: $(Join-Path $certDir 'certificate.pem')"
 Write-Host "NOTE: Android clients must explicitly trust this certificate for development."

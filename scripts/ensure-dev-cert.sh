@@ -5,7 +5,7 @@ set -eu
 
 cert_dir=/certs
 keystore="$cert_dir/keystore.p12"
-public_cert="$cert_dir/dev_server.crt"
+public_cert="$cert_dir/certificate.pem"
 pass="${TLS_KEYSTORE_PASSWORD:?TLS_KEYSTORE_PASSWORD is required}"
 host="${TLS_HOST:-localhost}"
 
@@ -65,5 +65,5 @@ chmod 600 "$keystore"
 keytool -exportcert -rfc -alias ems-backend -keystore "$keystore" \
   -storetype PKCS12 -storepass "$pass" -file "$public_cert"
 chmod 644 "$public_cert"
-echo "Created private keystore and public dev_server.crt in certs/."
-echo "Android debug clients must explicitly trust dev_server.crt and use a name/IP in SAN."
+echo "Created private keystore and public certificate.pem in certs/."
+echo "Android debug clients must explicitly trust certificate.pem and use a name/IP in SAN."
