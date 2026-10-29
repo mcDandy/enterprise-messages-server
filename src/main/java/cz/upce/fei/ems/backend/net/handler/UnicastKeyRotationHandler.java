@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
-import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -26,21 +25,19 @@ public class UnicastKeyRotationHandler implements PacketHandler {
         return PacketType.UNICAST_KEY_ROTATION;
     }
 
-    @Override
     public void handle(WebSocketSession session, Packet packet) throws Exception {
         byte[] payload = packet.getPayload();
-        if (payload == null || payload.length < 1) {
+        if (payload == null || payload.length < 9) {
             dispatcher.sendError(session, "Invalid unicast rotation payload.");
             return;
         }
-        AppUser appUser;
+
         String senderUsername = (String) session.getAttributes().get("username");
         if (senderUsername == null || appUserRepository.findByUsername(senderUsername).isEmpty()) {
             dispatcher.sendError(session, "Unauthorized connection.");
             return;
-        } else {
-            appUser = appUserRepository.findByUsername(senderUsername).get();
         }
+        AppUser appUser = appUserRepository.findByUsername(senderUsername).get();
 
         Long channelId = (Long) session.getAttributes().get("currentChannelId");
         if (channelId == null) {
@@ -48,16 +45,19 @@ public class UnicastKeyRotationHandler implements PacketHandler {
             return;
         }
 
-        Packet newPacket = new Packet(PacketType.UNICAST_KEY_ROTATION.getCode(), payload);
         ByteBuffer buffer = ByteBuffer.wrap(payload);
         long recipientUserId = buffer.getLong();
+
         byte[] ciphertext = new byte[buffer.remaining()];
+        buffer.get(ciphertext);
 
         if (appUser.getId() == recipientUserId) {
             dispatcher.sendError(session, "You are sending key to yourself");
             return;
         }
 
-        keyRotationService.handleClientUnicastRotation(channelId, senderUsername, recipientUserId, ciphertext, newPacket);
+        keyRotationService.handleClientUnicastRotation(
+                channelId, appUser.getId(), senderUsername, recipientUserId, ciphertext
+        );
     }
 }
