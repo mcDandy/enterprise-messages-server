@@ -3,7 +3,6 @@ package cz.upce.fei.ems.backend.service;
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.domain.ChannelMember;
-import cz.upce.fei.ems.backend.domain.UserKey;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.UserKeyResponseDto;
@@ -103,15 +102,8 @@ public class ChannelService {
         return userIds.stream()
                 .map(userId -> userKeyRepository.findByUserIdAndRevokedAtIsNull(userId).orElse(null))
                 .filter(Objects::nonNull)
-                .map(this::mapToKeyResponse)
+                .map(UserKeyResponseDto::fromEntity)
                 .toList();
-    }
-
-    private UserKeyResponseDto mapToKeyResponse(UserKey userKey) {
-        return UserKeyResponseDto.builder()
-                .id(userKey.getId())
-                .publicKey(userKey.getPublicKey())
-                .build();
     }
 
     public List<Channel> getMyChannelsForServer(Long serverId, String username) {
