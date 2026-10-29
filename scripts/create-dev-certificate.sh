@@ -9,7 +9,7 @@ fi
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cert_dir="$root/certs"
 keystore="$cert_dir/keystore.p12"
-public_cert="$cert_dir/dev-server.crt"
+public_cert="$cert_dir/certificate.pem"
 
 if [[ -n "${JAVA_HOME:-}" && -x "$JAVA_HOME/bin/keytool" ]]; then
   keytool="$JAVA_HOME/bin/keytool"

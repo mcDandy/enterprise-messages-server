@@ -55,8 +55,9 @@ Tests use a separate database. Remove the test containers afterwards with
 
 ## Existing database upgrade
 
-Fresh databases initialize automatically and need no migrations. For a database
-that has already applied migrations 001 and 002, **back up PostgreSQL first**:
+Fresh databases initialize automatically from `database/schema.sql`. Existing
+PostgreSQL volumes need migrations when backend/database versions change.
+**Back up PostgreSQL and stop the backend first** (also when using dev mode):
 
 ```sh
 docker compose stop backend
@@ -64,16 +65,24 @@ docker compose --profile migrate run --rm migrate
 docker compose up -d --build
 ```
 
-The migration runner applies 003 or skips it if already applied. For older
-databases, see [DATABASE_README.md](DATABASE_README.md). Do not use
-`docker compose down -v` unless you intend to delete the database volume.
+The migration runner recognizes the legacy table layout and applies any
+required migrations **001 → 002 → 003 → 004** in order. It skips migrations
+already reflected in the schema, including on a fresh database. Unknown or
+partially upgraded schema states cause an error rather than destructive guesses.
+
+**Important:** Migration 003 replaces numeric channel-key versions with new
+UUIDs. Clients remembering old numeric versions need a separate migration of
+their local mapping. For details, see [DATABASE_README.md](DATABASE_README.md).
+If you use `compose.dev.yaml --watch`, stop that session first and restart it
+with the dev command afterwards instead of starting the normal backend. Never
+use `docker compose down -v` unless you intend to delete the database volume.
 
 ## Configuration
 
 Set `HTTPS_PORT`, `TLS_HOST` and `TLS_CERTS_DIR` in `.env` if needed. For a
 physical Android device, set `TLS_HOST` to the PC's reachable IP **before the
 first start**; changing it later does not regenerate an existing certificate.
-The self-signed `dev_server.crt` must be trusted by Android. Use a trusted
+The self-signed `certificate.pem` must be trusted by Android. Use a trusted
 certificate outside development.
 
 By default the containers are named `ems-server` and `db`. Set

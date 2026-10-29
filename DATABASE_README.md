@@ -7,31 +7,35 @@ the host. `database/schema.sql` initializes only new databases. Hibernate uses
 
 ## Migrations
 
-For migration 003, use the upgrade commands in [README.md](README.md).
-`scripts/migrate-db.sh` runs only 003 and detects whether it is already applied.
-It removes `fcm_token` and `key_hash` and changes key versions from integer
-to UUID, retaining message foreign keys.
+`database/schema.sql` initializes only a **new** PostgreSQL volume. Existing
+databases are upgraded by `scripts/migrate-db.sh` in the Compose `migrate`
+profile. **Back up PostgreSQL and stop the backend before applying migrations.**
 
-Databases older than migration 002 must first run any missing migrations 001
-and 002, in that order. **Back up PostgreSQL and stop the backend first.**
-Do not apply these to a fresh database or repeat migration 002.
-
-PowerShell:
-
-```powershell
-Get-Content -Raw database/migrations/001_sync_app_user.sql | docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U nnpro -d nnpro
-Get-Content -Raw database/migrations/002_update_message_schema.sql | docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U nnpro -d nnpro
-```
-
-Linux shell:
+PowerShell and Linux/macOS (from the repository root):
 
 ```sh
-docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U nnpro -d nnpro < database/migrations/001_sync_app_user.sql
-docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U nnpro -d nnpro < database/migrations/002_update_message_schema.sql
+docker compose stop backend
+docker compose --profile migrate run --rm migrate
+docker compose up -d --build
 ```
 
-Run only the missing migrations. Migration 003 generates new UUIDs for any
-existing key versions; clients storing numeric versions need their own mapping.
+The runner detects the schema version from its tables/columns and applies the
+missing migrations in order:
+
+- **001** – normalizes `app_user` columns (rerunnable; only used pre-003).
+- **002** – renames channel tables and converts message receipts; archives the
+  old per-message receipts as `message_receipt_legacy`.
+- **003** – removes `fcm_token` and `key_hash`, switches key versions to UUID.
+- **004** – creates persistent E2EE pending key delivery and rotation queues.
+
+The runner skips migrations reflected in the schema, including for a newly
+initialized database. It stops on unexpected/partially upgraded schemas rather
+than applying potentially destructive DDL. Do not run migrations 002–004 by hand
+more than once.
+
+**Compatibility warning:** 003 assigns new UUID versions to historical channel
+keys. Clients that previously stored numeric key versions must migrate their
+local mapping; the UUIDs cannot be derived from old integers.
 
 ## Tools
 
