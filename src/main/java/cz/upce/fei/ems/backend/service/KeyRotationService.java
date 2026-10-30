@@ -34,7 +34,10 @@ public class KeyRotationService {
         try {
             WebSocketSession selected = selectOnlineClient(currentChannelMembers);
             if (selected == null) {
-                log.warn("No online client available for channel {}. Storing pending rotation trigger in DB.", channelId);
+                log.warn(
+                        "No online client available for channel {}. Storing pending rotation trigger in DB.",
+                        channelId
+                );
 
                 if (channelRotationPendingRepository.findByChannelId(channelId).isEmpty()) {
                     ChannelRotationPending pending = new ChannelRotationPending();
@@ -85,8 +88,12 @@ public class KeyRotationService {
     public void handleClientUnicastRotation(
             Long channelId, Long senderUserId, String senderUsername, Long recipientUserId, byte[] ciphertext
     ) {
-        System.out.println("[DEBUG-SYS] KeyRotationService.handleClientUnicastRotation() called -> channelId: " + channelId + ", sender: " + senderUsername + " (ID: " + senderUserId + "), recipientId: " + recipientUserId);
-        log.info("Handling client unicast rotation for channel {} from user {} to recipient ID {}", channelId, senderUsername, recipientUserId);
+        log.info(
+                "Handling client unicast rotation for channel {} from user {} to recipient ID {}",
+                channelId,
+                senderUsername,
+                recipientUserId
+        );
 
         UUID newVersionUuid = UUID.randomUUID();
         ChannelKey channelKey = new ChannelKey();
@@ -94,14 +101,17 @@ public class KeyRotationService {
         channelKey.setVersion(newVersionUuid);
         channelKeyRepository.save(channelKey);
 
-        System.out.println("[DEBUG-SYS] Created and saved new ChannelKey with version UUID: " + newVersionUuid);
-        log.info("User {} distributed new channel key version {} for channel {} (ciphertext size: {} bytes)",
-                senderUsername, newVersionUuid, channelId, ciphertext.length);
+        log.info(
+                "User {} distributed new channel key version {} for channel {} (ciphertext size: {} bytes)",
+                senderUsername,
+                newVersionUuid,
+                channelId,
+                ciphertext.length
+        );
 
         try {
             AppUser recipientUser = appUserRepository.findById(recipientUserId).orElse(null);
             if (recipientUser != null) {
-                System.out.println("[DEBUG-SYS] Recipient user found in DB: " + recipientUser.getUsername() + " (ID: " + recipientUserId + ")");
 
                 ByteBuffer recipientPayload = ByteBuffer.allocate(8 + ciphertext.length);
                 recipientPayload.putLong(senderUserId);
@@ -114,11 +124,9 @@ public class KeyRotationService {
 
                 WebSocketSession recipientSession = sessionRegistry.getSession(recipientUser.getUsername());
                 if (recipientSession != null && recipientSession.isOpen()) {
-                    System.out.println("[DEBUG-SYS] Recipient session is OPEN. Sending packet to username: " + recipientUser.getUsername());
                     dispatcher.sendTo(recipientSession, recipientPacket);
-                    log.debug("Forwarded unicast key rotation ciphertext to online user ID {}", recipientUserId);
+                    log.info("Forwarded unicast key rotation ciphertext to online user ID {}", recipientUserId);
                 } else {
-                    System.out.println("[DEBUG-SYS] Recipient session is NULL or CLOSED. Saving to DB pending queue for recipient ID: " + recipientUserId);
                     ChannelKeyPending pending = new ChannelKeyPending();
                     pending.setChannelId(channelId);
                     pending.setRecipientUserId(recipientUserId);
@@ -131,12 +139,9 @@ public class KeyRotationService {
                             recipientUserId, channelId);
                 }
             } else {
-                System.out.println("[DEBUG-SYS] ERROR: Recipient user ID " + recipientUserId + " NOT FOUND in database!");
                 log.warn("Recipient user ID {} not found in database during unicast key rotation.", recipientUserId);
             }
         } catch (Exception e) {
-            System.out.println("[DEBUG-SYS] EXCEPTION in handleClientUnicastRotation: " + e.getMessage());
-            e.printStackTrace();
             log.error("Failed to process unicast key rotation ciphertext from user {} to user {}: {}",
                     senderUsername, recipientUserId, e.getMessage(), e);
         }
