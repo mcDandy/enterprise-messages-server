@@ -55,6 +55,7 @@ public class ChannelMembershipService {
         member.setUserId(targetUserId);
 
         channelMemberRepository.save(member);
+        channelMemberRepository.flush();
 
         triggerKeyRotation(channelId);
     }
@@ -73,6 +74,7 @@ public class ChannelMembershipService {
                 .orElseThrow(() -> new IllegalArgumentException("Channel member not found"));
 
         channelMemberRepository.delete(member);
+        channelMemberRepository.flush();
         triggerKeyRotation(channelId);
     }
 
