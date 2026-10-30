@@ -29,10 +29,12 @@ public class UnicastKeyRotationHandler implements PacketHandler {
 
     @Override
     public void handle(WebSocketSession session, Packet packet) throws Exception {
+        System.out.println("[DEBUG-SYS] UnicastKeyRotationHandler.handle() called for session ID: " + session.getId());
         log.info("Handling UNICAST_KEY_ROTATION packet for session ID: {}", session.getId());
 
         byte[] payload = packet.getPayload();
         if (payload == null || payload.length < 9) {
+            System.out.println("[DEBUG-SYS] Invalid payload length: " + (payload != null ? payload.length : 0));
             log.warn("Invalid unicast rotation payload length: {}", payload != null ? payload.length : 0);
             dispatcher.sendError(session, "Invalid unicast rotation payload.");
             return;
@@ -41,12 +43,14 @@ public class UnicastKeyRotationHandler implements PacketHandler {
 
         Object usernameAttr = session.getAttributes().get("username");
         if (!(usernameAttr instanceof String senderUsername)) {
+            System.out.println("[DEBUG-SYS] Unauthorized: 'username' attribute missing or not String (found: " + usernameAttr + ")");
             log.warn("Unauthorized connection attempt: 'username' session attribute is missing or not a String (found: {})", usernameAttr);
             dispatcher.sendError(session, "Unauthorized connection.");
             return;
         }
 
         if (appUserRepository.findByUsername(senderUsername).isEmpty()) {
+            System.out.println("[DEBUG-SYS] User '" + senderUsername + "' not found in database!");
             log.warn("User '{}' found in session attributes, but does not exist in database.", senderUsername);
             dispatcher.sendError(session, "Unauthorized connection.");
             return;
@@ -56,6 +60,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
 
         Object channelAttr = session.getAttributes().get("currentChannelId");
         if (!(channelAttr instanceof Long channelId)) {
+            System.out.println("[DEBUG-SYS] User '" + senderUsername + "' has no active channel ('currentChannelId': " + channelAttr + ")");
             log.warn("User '{}' tried to rotate key without active channel. 'currentChannelId' attribute: {}", senderUsername, channelAttr);
             dispatcher.sendError(session, "User is not in an active channel.");
             return;
@@ -70,6 +75,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
         log.info("Buffer parsed -> recipientUserId: {}, ciphertext length: {} bytes", recipientUserId, ciphertext.length);
 
         if (appUser.getId() == recipientUserId) {
+            System.out.println("[DEBUG-SYS] User ID " + appUser.getId() + " tried to send key to themselves.");
             log.warn("User '{}' (ID: {}) attempted to send unicast key rotation to themselves (recipient ID matches sender).", senderUsername, appUser.getId());
             dispatcher.sendError(session, "You are sending key to yourself");
             return;
