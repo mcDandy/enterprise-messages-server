@@ -37,7 +37,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
             dispatcher.sendError(session, "Invalid unicast rotation payload.");
             return;
         }
-        log.debug("Payload received successfully, size: {} bytes", payload.length);
+        log.info("Payload received successfully, size: {} bytes", payload.length);
 
         Object usernameAttr = session.getAttributes().get("username");
         if (!(usernameAttr instanceof String senderUsername)) {
@@ -52,7 +52,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
             return;
         }
         AppUser appUser = appUserRepository.findByUsername(senderUsername).get();
-        log.debug("Authenticated sender resolved: {} (ID: {})", senderUsername, appUser.getId());
+        log.info("Authenticated sender resolved: {} (ID: {})", senderUsername, appUser.getId());
 
         Object channelAttr = session.getAttributes().get("currentChannelId");
         if (!(channelAttr instanceof Long channelId)) {
@@ -60,14 +60,14 @@ public class UnicastKeyRotationHandler implements PacketHandler {
             dispatcher.sendError(session, "User is not in an active channel.");
             return;
         }
-        log.debug("Active channel ID resolved: {}", channelId);
+        log.info("Active channel ID resolved: {}", channelId);
 
         ByteBuffer buffer = ByteBuffer.wrap(payload);
         long recipientUserId = buffer.getLong();
 
         byte[] ciphertext = new byte[buffer.remaining()];
         buffer.get(ciphertext);
-        log.debug("Buffer parsed -> recipientUserId: {}, ciphertext length: {} bytes", recipientUserId, ciphertext.length);
+        log.info("Buffer parsed -> recipientUserId: {}, ciphertext length: {} bytes", recipientUserId, ciphertext.length);
 
         if (appUser.getId() == recipientUserId) {
             log.warn("User '{}' (ID: {}) attempted to send unicast key rotation to themselves (recipient ID matches sender).", senderUsername, appUser.getId());
