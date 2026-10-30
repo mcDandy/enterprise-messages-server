@@ -58,6 +58,7 @@ public class ChannelMembershipController {
             @Valid @RequestBody AddChannelMemberRequestDto request,
             Principal principal) {
         channelMembershipService.addMemberToChannel(channelId, request.getUserId(), principal.getName());
+        channelMembershipService.triggerKeyRotation(channelId);
         return ResponseEntity.ok().build();
     }
 
@@ -76,6 +77,7 @@ public class ChannelMembershipController {
             @PathVariable Long userId,
             Principal principal) {
         channelMembershipService.removeMemberFromChannel(channelId, userId, principal.getName());
+        channelMembershipService.triggerKeyRotation(channelId);
         return ResponseEntity.noContent().build();
     }
 }

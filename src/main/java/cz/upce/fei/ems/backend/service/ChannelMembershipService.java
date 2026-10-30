@@ -56,8 +56,6 @@ public class ChannelMembershipService {
 
         channelMemberRepository.save(member);
         channelMemberRepository.flush();
-
-        triggerKeyRotation(channelId);
     }
 
     @Transactional
@@ -75,10 +73,10 @@ public class ChannelMembershipService {
 
         channelMemberRepository.delete(member);
         channelMemberRepository.flush();
-        triggerKeyRotation(channelId);
     }
 
-    private void triggerKeyRotation(Long channelId) {
+    @Transactional
+    public void triggerKeyRotation(Long channelId) {
         try {
             Set<String> currentMembers = channelMemberRepository.findByChannelId(channelId).stream()
                     .map(member -> appUserRepository.findById(member.getUserId()).orElse(null))
