@@ -66,9 +66,9 @@ public class AuthController {
             summary = "Get User Public Key",
             description = "Returns the public E2EE key for a given user so the sender can encrypt a message for them."
     )
-    @GetMapping(value = "/public-key/{username}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Map<String, String>> getPublicKey(@PathVariable String username) {
-        String publicKey = authService.getPublicKey(username);
+    @GetMapping(value = "/public-key/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, String>> getPublicKey(@PathVariable Long id) {
+        String publicKey = authService.getPublicKey(id);
         return ResponseEntity.ok(Map.of("publicKey", publicKey));
     }
 }

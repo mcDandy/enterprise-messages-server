@@ -73,8 +73,8 @@ public class AuthService {
                 .build();
     }
 
-    public String getPublicKey(String username) {
-        AppUser user = userRepository.findByUsername(username)
+    public String getPublicKey(Long id) {
+        AppUser user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Uživatel nenalezen"
                 ));
