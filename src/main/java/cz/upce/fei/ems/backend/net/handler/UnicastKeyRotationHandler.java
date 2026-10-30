@@ -58,20 +58,9 @@ public class UnicastKeyRotationHandler implements PacketHandler {
         AppUser appUser = appUserRepository.findByUsername(senderUsername).get();
         log.info("Authenticated sender resolved: {} (ID: {})", senderUsername, appUser.getId());
 
-        Object channelAttr = session.getAttributes().get("currentChannelId");
-        if (!(channelAttr instanceof Long channelId)) {
-            log.warn(
-                    "User '{}' tried to rotate key without active channel. 'currentChannelId' attribute: {}",
-                    senderUsername,
-                    channelAttr
-            );
-            dispatcher.sendError(session, "User is not in an active channel.");
-            return;
-        }
-        log.info("Active channel ID resolved: {}", channelId);
-
         ByteBuffer buffer = ByteBuffer.wrap(payload);
         long recipientUserId = buffer.getLong();
+        long channelId = buffer.getLong();
 
         byte[] ciphertext = new byte[buffer.remaining()];
         buffer.get(ciphertext);

@@ -94,6 +94,13 @@ public class KeyRotationService {
                 senderUsername,
                 recipientUserId
         );
+        if (
+                !channelMemberRepository.existsByChannelIdAndUserId(channelId, senderUserId)
+                        || !channelMemberRepository.existsByChannelIdAndUserId(channelId, recipientUserId)
+        ) {
+            log.error("User {} and user {} are not together in channel {}", senderUsername, recipientUserId, channelId);
+        }
+
 
         UUID newVersionUuid = UUID.randomUUID();
         ChannelKey channelKey = new ChannelKey();
