@@ -120,8 +120,9 @@ public class KeyRotationService {
             AppUser recipientUser = appUserRepository.findById(recipientUserId).orElse(null);
             if (recipientUser != null) {
 
-                ByteBuffer recipientPayload = ByteBuffer.allocate(8 + ciphertext.length);
-                recipientPayload.putLong(senderUserId);
+                ByteBuffer recipientPayload = ByteBuffer.allocate(2 * Long.BYTES + ciphertext.length);
+                recipientPayload.putLong(newVersionUuid.getMostSignificantBits());
+                recipientPayload.putLong(newVersionUuid.getLeastSignificantBits());
                 recipientPayload.put(ciphertext);
 
                 Packet recipientPacket = new Packet(
@@ -134,6 +135,7 @@ public class KeyRotationService {
                     dispatcher.sendTo(recipientSession, recipientPacket);
                     log.info("Forwarded unicast key rotation ciphertext to online user ID {}", recipientUserId);
                 } else {
+                    //todo prekopat tabulku
                     ChannelKeyPending pending = new ChannelKeyPending();
                     pending.setChannelId(channelId);
                     pending.setRecipientUserId(recipientUserId);
