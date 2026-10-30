@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
+import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -101,6 +102,12 @@ public class KeyRotationService {
             log.error("User {} and user {} are not together in channel {}", senderUsername, recipientUserId, channelId);
         }
 
+        var channelToInvalidate = channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId);
+        if (channelToInvalidate.isPresent()){
+            channelToInvalidate.get().setInvalidatedAt(OffsetDateTime.now());
+            channelKeyRepository.save(channelToInvalidate.get());
+            channelKeyRepository.flush();
+        }
 
         UUID newVersionUuid = UUID.randomUUID();
         ChannelKey channelKey = new ChannelKey();
