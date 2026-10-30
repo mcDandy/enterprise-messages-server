@@ -12,7 +12,7 @@ public class AuthResponseDto {
 
     @Schema(
             description = "JWT token (Bearer)",
-            example = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
     )
     private String token;
 
@@ -21,4 +21,9 @@ public class AuthResponseDto {
     )
     private String username;
 
+    @Schema(
+            description = "Token expiration timestamp in milliseconds (Epoch)",
+            example = "1717161600000"
+    )
+    private Long expiresAt;
 }

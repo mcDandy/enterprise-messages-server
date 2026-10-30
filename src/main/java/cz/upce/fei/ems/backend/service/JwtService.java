@@ -70,6 +70,10 @@ public class JwtService {
         return extractExpiration(token).before(new Date());
     }
 
+    public long getExpirationTimestamp(String token) {
+        return extractExpiration(token).getTime();
+    }
+
     private Date extractExpiration(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())

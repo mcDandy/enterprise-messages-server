@@ -2,6 +2,7 @@ package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.dto.AuthResponseDto;
 import cz.upce.fei.ems.backend.dto.LoginRequestDto;
+import cz.upce.fei.ems.backend.dto.RefreshTokenRequestDto;
 import cz.upce.fei.ems.backend.dto.RegisterRequestDto;
 import cz.upce.fei.ems.backend.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -70,5 +71,21 @@ public class AuthController {
     public ResponseEntity<Map<String, String>> getPublicKey(@PathVariable Long id) {
         String publicKey = authService.getPublicKey(id);
         return ResponseEntity.ok(Map.of("publicKey", publicKey));
+    }
+
+    @Operation(
+            summary = "Refresh JWT Token",
+            description = "Exchanges an expired or valid token for a new JWT token.",
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200", description = "Token refreshed successfully.",
+                            content = @Content(schema = @Schema(implementation = AuthResponseDto.class))
+                    ),
+                    @ApiResponse(responseCode = "401", description = "Invalid or expired token", content = @Content)
+            }
+    )
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponseDto> refreshToken(@Valid @RequestBody RefreshTokenRequestDto request) {
+        return ResponseEntity.ok(authService.refreshToken(request));
     }
 }
