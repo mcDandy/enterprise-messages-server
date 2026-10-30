@@ -26,6 +26,9 @@ public class PacketCodec {
 
     public Packet decode(ByteBuffer buffer) {
         byte type = buffer.get();
-        return new Packet(type, buffer.array());
+        byte[] payload = new byte[buffer.remaining()];
+        buffer.get(payload);
+
+        return new Packet(type, payload);
     }
 }
