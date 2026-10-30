@@ -39,27 +39,31 @@ public class KeyRotationService {
                         "No online client available for channel {}. Storing pending rotation trigger in DB.",
                         channelId
                 );
-
-                if (channelRotationPendingRepository.findByChannelId(channelId).isEmpty()) {
-                    ChannelRotationPending pending = new ChannelRotationPending();
-                    pending.setChannelId(channelId);
-                    channelRotationPendingRepository.save(pending);
-                }
-
+                //todo add to front
                 return;
             }
 
-            channelRotationPendingRepository.deleteByChannelId(channelId);
+            Optional<ChannelKey> channelKey = channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId);
 
-            UUID requestId = UUID.randomUUID();
+            if (channelKey.isPresent()) {
+            channelKey.get().setInvalidatedAt(OffsetDateTime.now());
+            channelKeyRepository.save(channelKey.get());
+            channelKeyRepository.flush();
+            }
+
+            ChannelKey channelKeyNew = new ChannelKey();
+            channelKeyNew.setChannelId(channelId);
+            UUID uuid = UUID.randomUUID();
+            channelKeyNew.setVersion(uuid);
+            channelKeyRepository.save(channelKeyNew);
 
             ByteBuffer buffer = ByteBuffer.allocate(24);
-            buffer.putLong(requestId.getMostSignificantBits());
-            buffer.putLong(requestId.getLeastSignificantBits());
+            buffer.putLong(uuid.getMostSignificantBits());
+            buffer.putLong(uuid.getLeastSignificantBits());
             buffer.putLong(channelId);
 
             log.info("Initiating key rotation for channel {} using client: {} (requestId: {})",
-                    channelId, selected.getAttributes().get("username"), requestId);
+                    channelId, selected.getAttributes().get("username"), uuid);
 
             dispatcher.sendTo(selected, new Packet(
                     PacketType.ROTATE_KEY.getCode(),
@@ -102,34 +106,29 @@ public class KeyRotationService {
             log.error("User {} and user {} are not together in channel {}", senderUsername, recipientUserId, channelId);
         }
 
-        var channelToInvalidate = channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId);
-        if (channelToInvalidate.isPresent()){
-            channelToInvalidate.get().setInvalidatedAt(OffsetDateTime.now());
-            channelKeyRepository.save(channelToInvalidate.get());
-            channelKeyRepository.flush();
-        }
+        Optional<ChannelKey> channelKey = channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId);
 
-        UUID newVersionUuid = UUID.randomUUID();
-        ChannelKey channelKey = new ChannelKey();
-        channelKey.setChannelId(channelId);
-        channelKey.setVersion(newVersionUuid);
-        channelKeyRepository.save(channelKey);
+        if (channelKey.isEmpty()) {
+            log.error("Channel key does not exists");
+            return;
+        }
 
         log.info(
                 "User {} distributed new channel key version {} for channel {} (ciphertext size: {} bytes)",
                 senderUsername,
-                newVersionUuid,
+                channelKey,
                 channelId,
                 ciphertext.length
         );
 
         try {
             AppUser recipientUser = appUserRepository.findById(recipientUserId).orElse(null);
-            if (recipientUser != null) {
 
-                ByteBuffer recipientPayload = ByteBuffer.allocate(2 * Long.BYTES + ciphertext.length);
-                recipientPayload.putLong(newVersionUuid.getMostSignificantBits());
-                recipientPayload.putLong(newVersionUuid.getLeastSignificantBits());
+            if (recipientUser != null) {
+                ByteBuffer recipientPayload = ByteBuffer.allocate(3 * Long.BYTES + ciphertext.length);
+                recipientPayload.putLong(senderUserId);
+                recipientPayload.putLong(channelKey.get().getVersion().getMostSignificantBits());
+                recipientPayload.putLong(channelKey.get().getVersion().getLeastSignificantBits());
                 recipientPayload.put(ciphertext);
 
                 Packet recipientPacket = new Packet(
@@ -146,7 +145,6 @@ public class KeyRotationService {
                     ChannelKeyPending pending = new ChannelKeyPending();
                     pending.setChannelId(channelId);
                     pending.setRecipientUserId(recipientUserId);
-                    pending.setChannelKeyId(channelKey.getId());
                     pending.setCiphertext(ciphertext);
 
                     channelKeyPendingRepository.save(pending);
