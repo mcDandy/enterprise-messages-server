@@ -46,12 +46,41 @@ require the dev override.
 
 ## Tests
 
-```sh
-docker compose -p nnpro-tests --profile test run --rm --build tests
+### Run functional tests from IntelliJ with Docker PostgreSQL
+
+Start the normal Compose stack. It includes a separate, disposable PostgreSQL
+test database on `localhost:55432` and runs the existing migration runner
+against it before it reports healthy:
+
+```powershell
+docker compose up -d --wait
 ```
 
-Tests use a separate database. Remove the test containers afterwards with
-`docker compose -p nnpro-tests --profile test down`.
+In IntelliJ, run tests with the Gradle test runner; test configuration defaults
+to `jdbc:postgresql://localhost:55432/nnpro_test`, user `nnpro`, password
+`nnpro_local_test`. Override these with `TEST_DB_URL`, `TEST_DB_USERNAME`, and
+`TEST_DB_PASSWORD` if needed. The test DB is separate from the backend's
+`nnpro` database and is disposable. The migration runner applies missing
+migrations 001–004 to it at startup; its health check only passes once the
+current schema is ready. `PointToPointWebSocketFunctionalTest` starts Spring on
+a random port and verifies that an authenticated client's unicast key-rotation
+packet reaches the intended authenticated recipient. It creates uniquely named
+records and cleans them up afterwards.
+
+Run only the point-to-point functional test from a terminal with:
+
+```powershell
+.\gradlew.bat test --tests "*PointToPointWebSocketFunctionalTest"
+```
+
+### Run tests with Docker Compose
+
+```sh
+docker compose run --rm --build tests
+```
+
+The Compose test runner uses the same isolated database and waits for migrations
+to complete. It can reuse the test database started by `docker compose up`.
 
 ## Existing database upgrade
 
