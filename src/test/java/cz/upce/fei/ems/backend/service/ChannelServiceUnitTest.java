@@ -30,6 +30,8 @@ class ChannelServiceUnitTest {
     @Mock
     private MessageServerService serverService;
     @Mock
+    private ChannelDeletionService channelDeletionService;
+    @Mock
     private KeyRotationService keyRotationService;
     @Mock
     private MessageServerRepository messageServerRepository;
@@ -107,6 +109,6 @@ class ChannelServiceUnitTest {
 
         channelService.deleteChannel(10L, "testuser");
 
-        verify(channelRepository).delete(channel);
+        verify(channelDeletionService).deleteChannel(channel);
     }
 }

@@ -53,6 +53,7 @@ public class ChannelMembershipRestApiIntegrationTest extends BaseRestApiIntegrat
         // Remove member
         HttpResponse<String> removeResp = delete("/api/channels/" + channelId + "/members/" + userId, adminToken);
         assertEquals(204, removeResp.statusCode());
+        assertEquals(204, delete("/api/channels/" + channelId + "/members/" + userId, adminToken).statusCode());
 
         // Check members again
         HttpResponse<String> getResp2 = get("/api/channels/" + channelId + "/members", adminToken);
@@ -65,5 +66,26 @@ public class ChannelMembershipRestApiIntegrationTest extends BaseRestApiIntegrat
             }
         }
         assertFalse(found);
+    }
+
+    @Test
+    void removingMissingChannelMemberReturnsNoContent() throws Exception {
+        String adminToken = loginAndGetToken("membership_missing_admin", "Password123!");
+        CreateServerRequestDto serverRequest = new CreateServerRequestDto();
+        serverRequest.setName("Membership Missing Server");
+        serverRequest.setType(MessageServerType.ORGANIZATION);
+        HttpResponse<String> serverResponse = post("/api/servers", adminToken, serverRequest);
+        Long serverId = objectMapper.readTree(serverResponse.body()).get("id").asLong();
+
+        CreateChannelRequestDto channelRequest = new CreateChannelRequestDto();
+        channelRequest.setName("Membership Missing Channel");
+        HttpResponse<String> channelResponse = post(
+                "/api/servers/" + serverId + "/channels", adminToken, channelRequest);
+        Long channelId = objectMapper.readTree(channelResponse.body()).get("id").asLong();
+
+        HttpResponse<String> response = delete(
+                "/api/channels/" + channelId + "/members/999999", adminToken);
+
+        assertEquals(204, response.statusCode());
     }
 }

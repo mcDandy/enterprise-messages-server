@@ -66,9 +66,9 @@ public class ChannelMembershipController {
             summary = "Remove member from channel",
             description = "Removes a user from the channel (Server Admin only).",
             responses = {
-                    @ApiResponse(responseCode = "204", description = "Member removed from channel successfully"),
-                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content),
-                    @ApiResponse(responseCode = "404", description = "Member not found", content = @Content)
+                    @ApiResponse(responseCode = "204",
+                            description = "Removal completed; succeeds if the membership was already absent"),
+                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content)
             }
     )
     @DeleteMapping("/{userId}")
@@ -76,8 +76,13 @@ public class ChannelMembershipController {
             @PathVariable Long channelId,
             @PathVariable Long userId,
             Principal principal) {
-        channelMembershipService.removeMemberFromChannel(channelId, userId, principal.getName());
-        channelMembershipService.triggerKeyRotation(channelId);
-        return ResponseEntity.noContent().build();
+        try {
+            if (channelMembershipService.removeMemberFromChannel(channelId, userId, principal.getName())) {
+                channelMembershipService.triggerKeyRotation(channelId);
+            }
+            return ResponseEntity.noContent().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).build();
+        }
     }
 }

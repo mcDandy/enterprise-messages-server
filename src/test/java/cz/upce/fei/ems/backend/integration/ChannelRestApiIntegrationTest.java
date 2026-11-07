@@ -1,17 +1,35 @@
 package cz.upce.fei.ems.backend.integration;
 
 import cz.upce.fei.ems.backend.domain.MessageServerType;
+import cz.upce.fei.ems.backend.domain.ChannelKey;
+import cz.upce.fei.ems.backend.domain.Message;
+import cz.upce.fei.ems.backend.domain.MessageReceipt;
+import cz.upce.fei.ems.backend.domain.MessageReceiptId;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.CreateServerRequestDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
+import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
+import cz.upce.fei.ems.backend.repository.MessageReceiptRepository;
+import cz.upce.fei.ems.backend.repository.MessageRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class ChannelRestApiIntegrationTest extends BaseRestApiIntegrationTest {
+
+    @Autowired
+    private ChannelKeyRepository channelKeyRepository;
+    @Autowired
+    private MessageRepository messageRepository;
+    @Autowired
+    private MessageReceiptRepository messageReceiptRepository;
 
     @Test
     void shouldCreateAndGetChannel() throws Exception {
@@ -65,7 +83,7 @@ public class ChannelRestApiIntegrationTest extends BaseRestApiIntegrationTest {
     }
 
     @Test
-    void shouldDeleteChannel() throws Exception {
+    void shouldDeleteChannelAndDependentMessages() throws Exception {
         String token = loginAndGetToken("channel_delete", "Password123!");
         
         CreateServerRequestDto serverReq = new CreateServerRequestDto();
@@ -79,10 +97,43 @@ public class ChannelRestApiIntegrationTest extends BaseRestApiIntegrationTest {
         HttpResponse<String> createResponse = post("/api/servers/" + serverId + "/channels", token, channelReq);
         Long channelId = objectMapper.readTree(createResponse.body()).get("id").asLong();
 
+        Long userId = userRepository.findByUsername("channel_delete").orElseThrow().getId();
+        ChannelKey channelKey = new ChannelKey();
+        channelKey.setChannelId(channelId);
+        channelKey.setVersion(UUID.randomUUID());
+        channelKey = channelKeyRepository.save(channelKey);
+
+        Message message = new Message();
+        message.setChannelId(channelId);
+        message.setSenderId(userId);
+        message.setChannelKeyId(channelKey.getId());
+        message.setCiphertext("ciphertext".getBytes(StandardCharsets.UTF_8));
+        message = messageRepository.save(message);
+
+        MessageReceipt receipt = new MessageReceipt();
+        receipt.setMessageChannelId(channelId);
+        receipt.setUserId(userId);
+        receipt.setLastDeliveredMessageId(message.getId());
+        receipt.setLastReadMessageId(message.getId());
+        messageReceiptRepository.save(receipt);
+
         HttpResponse<String> deleteResponse = delete("/api/channels/" + channelId, token);
         assertEquals(204, deleteResponse.statusCode());
+        assertEquals(204, delete("/api/channels/" + channelId, token).statusCode());
 
         HttpResponse<String> getResponse = get("/api/channels/" + channelId, token);
         assertEquals(404, getResponse.statusCode());
+        assertTrue(messageRepository.findByChannelId(channelId, PageRequest.of(0, 10)).isEmpty());
+        assertTrue(channelKeyRepository.findByChannelIdAndVersion(channelId, channelKey.getVersion()).isEmpty());
+        assertTrue(messageReceiptRepository.findById(new MessageReceiptId(channelId, userId)).isEmpty());
+    }
+
+    @Test
+    void deletingMissingChannelReturnsNoContent() throws Exception {
+        String token = loginAndGetToken("channel_delete_missing", "Password123!");
+
+        HttpResponse<String> response = delete("/api/channels/999999", token);
+
+        assertEquals(204, response.statusCode());
     }
 }

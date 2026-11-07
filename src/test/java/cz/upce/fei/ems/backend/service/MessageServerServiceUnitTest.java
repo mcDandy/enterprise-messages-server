@@ -2,6 +2,7 @@ package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.*;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
+import cz.upce.fei.ems.backend.repository.ChannelRepository;
 import cz.upce.fei.ems.backend.repository.MessageServerRepository;
 import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +27,10 @@ class MessageServerServiceUnitTest {
     private ServerMemberRepository serverMemberRepository;
     @Mock
     private AppUserRepository appUserRepository;
+    @Mock
+    private ChannelRepository channelRepository;
+    @Mock
+    private ChannelDeletionService channelDeletionService;
 
     @InjectMocks
     private MessageServerService messageServerService;
@@ -81,9 +86,18 @@ class MessageServerServiceUnitTest {
 
     @Test
     void testDeleteServerForbidden() {
+        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
         when(appUserRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
         when(serverMemberRepository.findByServerIdAndUserId(10L, 1L)).thenReturn(Optional.empty());
 
         assertThrows(SecurityException.class, () -> messageServerService.deleteServer(10L, "testuser"));
+    }
+
+    @Test
+    void testDeleteServerNotFoundIsNoOp() {
+        when(serverRepository.findById(10L)).thenReturn(Optional.empty());
+
+        assertFalse(messageServerService.deleteServer(10L, "testuser"));
+        verifyNoInteractions(channelRepository, channelDeletionService);
     }
 }

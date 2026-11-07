@@ -2,6 +2,7 @@ package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.*;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
+import cz.upce.fei.ems.backend.repository.ChannelRepository;
 import cz.upce.fei.ems.backend.repository.MessageServerRepository;
 import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,8 @@ public class MessageServerService {
     private final MessageServerRepository serverRepository;
     private final ServerMemberRepository serverMemberRepository;
     private final AppUserRepository appUserRepository;
+    private final ChannelRepository channelRepository;
+    private final ChannelDeletionService channelDeletionService;
 
     public List<MessageServer> getServersForUser(String username) {
         AppUser user = appUserRepository.findByUsername(username)
@@ -51,9 +54,17 @@ public class MessageServerService {
     }
 
     @Transactional
-    public void deleteServer(Long serverId, String username) {
+    public boolean deleteServer(Long serverId, String username) {
+        MessageServer server = serverRepository.findById(serverId).orElse(null);
+        if (server == null) {
+            return false;
+        }
+
         validateServerAdmin(serverId, username);
-        serverRepository.deleteById(serverId);
+        channelRepository.findByServerIdOrderByNameAsc(serverId)
+                .forEach(channelDeletionService::deleteChannel);
+        serverRepository.delete(server);
+        return true;
     }
 
     public boolean isUserAdmin(Long serverId, String username) {

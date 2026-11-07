@@ -8,7 +8,6 @@ import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -59,20 +58,25 @@ public class ChannelMembershipService {
     }
 
     @Transactional
-    public void removeMemberFromChannel(Long channelId, Long targetUserId, String adminUsername) {
-        Channel channel = channelRepository.findById(channelId)
-                .orElseThrow(() -> new IllegalArgumentException("Channel not found"));
+    public boolean removeMemberFromChannel(Long channelId, Long targetUserId, String adminUsername) {
+        Channel channel = channelRepository.findById(channelId).orElse(null);
+        if (channel == null) {
+            return false;
+        }
+
+        ChannelMemberId memberId = new ChannelMemberId(channelId, targetUserId);
+        ChannelMember member = channelMemberRepository.findById(memberId).orElse(null);
+        if (member == null) {
+            return false;
+        }
 
         if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
             throw new SecurityException("Only server administrators can manage channel memberships.");
         }
 
-        ChannelMemberId memberId = new ChannelMemberId(channelId, targetUserId);
-        ChannelMember member = channelMemberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("Channel member not found"));
-
         channelMemberRepository.delete(member);
         channelMemberRepository.flush();
+        return true;
     }
 
     @Transactional

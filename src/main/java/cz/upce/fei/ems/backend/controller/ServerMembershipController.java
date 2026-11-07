@@ -65,9 +65,9 @@ public class ServerMembershipController {
     @Operation(
             summary = "Remove member from server (Admin only)",
             responses = {
-                    @ApiResponse(responseCode = "204", description = "Member removed successfully"),
-                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content),
-                    @ApiResponse(responseCode = "404", description = "Member not found", content = @Content)
+                    @ApiResponse(responseCode = "204",
+                            description = "Removal completed; succeeds if the membership was already absent"),
+                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content)
             }
     )
     @DeleteMapping("/{userId}")
@@ -75,8 +75,12 @@ public class ServerMembershipController {
             @PathVariable Long serverId,
             @PathVariable Long userId,
             Principal principal) {
-        membershipService.removeMemberFromServer(serverId, userId, principal.getName());
-        return ResponseEntity.noContent().build();
+        try {
+            membershipService.removeMemberFromServer(serverId, userId, principal.getName());
+            return ResponseEntity.noContent().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).build();
+        }
     }
 
     @Operation(

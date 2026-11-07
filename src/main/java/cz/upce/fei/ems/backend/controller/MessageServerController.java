@@ -115,9 +115,9 @@ public class MessageServerController {
             summary = "Delete server",
             description = "Deletes a server completely (Admin only).",
             responses = {
-                    @ApiResponse(responseCode = "204", description = "Server deleted successfully"),
-                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content),
-                    @ApiResponse(responseCode = "404", description = "Server not found", content = @Content)
+                    @ApiResponse(responseCode = "204",
+                            description = "Deletion completed; succeeds if the server was already absent"),
+                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content)
             }
     )
     @DeleteMapping("/{id}")

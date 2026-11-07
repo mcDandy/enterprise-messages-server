@@ -124,9 +124,9 @@ public class ChannelController {
             summary = "Delete channel",
             description = "Deletes a channel (Admin only).",
             responses = {
-                    @ApiResponse(responseCode = "204", description = "Channel deleted successfully"),
-                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content),
-                    @ApiResponse(responseCode = "404", description = "Channel not found", content = @Content)
+                    @ApiResponse(responseCode = "204",
+                            description = "Deletion completed; succeeds if the channel was already absent"),
+                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content)
             }
     )
     @DeleteMapping("/api/channels/{channelId}")

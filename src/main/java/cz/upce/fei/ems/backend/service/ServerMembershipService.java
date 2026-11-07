@@ -4,6 +4,7 @@ import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.MessageServerMember;
 import cz.upce.fei.ems.backend.domain.MessageServerRole;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
+import cz.upce.fei.ems.backend.repository.MessageServerRepository;
 import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ public class ServerMembershipService {
 
     private final ServerMemberRepository serverMemberRepository;
     private final AppUserRepository appUserRepository;
+    private final MessageServerRepository messageServerRepository;
     private final MessageServerService serverService;
 
     @Transactional
@@ -40,13 +42,23 @@ public class ServerMembershipService {
     }
 
     @Transactional
-    public void removeMemberFromServer(Long serverId, Long targetUserId, String adminUsername) {
+    public boolean removeMemberFromServer(Long serverId, Long targetUserId, String adminUsername) {
+        if (!messageServerRepository.existsById(serverId)) {
+            return false;
+        }
+
+        MessageServerMember member = serverMemberRepository.findByServerIdAndUserId(serverId, targetUserId)
+                .orElse(null);
+        if (member == null) {
+            return false;
+        }
+
         if (!serverService.isUserAdmin(serverId, adminUsername)) {
             throw new SecurityException("Only server administrators can remove members.");
         }
 
-        serverMemberRepository.findByServerIdAndUserId(serverId, targetUserId)
-                .ifPresent(serverMemberRepository::delete);
+        serverMemberRepository.delete(member);
+        return true;
     }
 
     @Transactional

@@ -24,6 +24,7 @@ public class ChannelService {
     private final AppUserRepository appUserRepository;
     private final ServerMemberRepository serverMemberRepository;
     private final MessageServerService serverService;
+    private final ChannelDeletionService channelDeletionService;
     private final KeyRotationService keyRotationService;
     private final UserKeyRepository userKeyRepository;
     private final MessageServerRepository messageServerRepository;
@@ -46,7 +47,9 @@ public class ChannelService {
         }
 
         if (channelRepository.existsByServerIdAndName(serverId, request.getName())) {
-            throw new IllegalStateException("Channel with name '" + request.getName() + "' already exists on this server.");
+            throw new IllegalStateException(
+                    "Channel with name '" + request.getName() + "' already exists on this server."
+            );
         }
 
         AppUser creator = appUserRepository.findByUsername(creatorUsername)
@@ -83,14 +86,18 @@ public class ChannelService {
     }
 
     @Transactional
-    public void deleteChannel(Long channelId, String adminUsername) {
+    public boolean deleteChannel(Long channelId, String adminUsername) {
         Channel channel = getChannelById(channelId);
-        if (channel != null) {
-            if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
-                throw new SecurityException("Only server administrators can delete channels.");
-            }
-            channelRepository.delete(channel);
+        if (channel == null) {
+            return false;
         }
+
+        if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
+            throw new SecurityException("Only server administrators can delete channels.");
+        }
+
+        channelDeletionService.deleteChannel(channel);
+        return true;
     }
 
     public List<UserKeyResponseDto> getActivePublicKeysForChannel(Long channelId, String username) {

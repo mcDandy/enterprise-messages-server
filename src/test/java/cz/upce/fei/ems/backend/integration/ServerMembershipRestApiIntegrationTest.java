@@ -67,5 +67,36 @@ public class ServerMembershipRestApiIntegrationTest extends BaseRestApiIntegrati
         // Remove member
         HttpResponse<String> removeResp = delete("/api/servers/" + serverId + "/members/" + userId, adminToken);
         assertEquals(204, removeResp.statusCode());
+        assertEquals(204, delete("/api/servers/" + serverId + "/members/" + userId, adminToken).statusCode());
+    }
+
+    @Test
+    void removingMissingServerMemberReturnsNoContent() throws Exception {
+        String adminToken = loginAndGetToken("srv_missing_admin", "Password123!");
+        CreateServerRequestDto serverRequest = new CreateServerRequestDto();
+        serverRequest.setName("Missing Member Server");
+        serverRequest.setType(MessageServerType.ORGANIZATION);
+        HttpResponse<String> serverResponse = post("/api/servers", adminToken, serverRequest);
+        Long serverId = objectMapper.readTree(serverResponse.body()).get("id").asLong();
+
+        HttpResponse<String> response = delete(
+                "/api/servers/" + serverId + "/members/999999", adminToken);
+
+        assertEquals(204, response.statusCode());
+    }
+
+    @Test
+    void deletingOwnServerMembershipRemainsIdempotentAfterAdminAccessIsRemoved() throws Exception {
+        String adminToken = loginAndGetToken("srv_self_remove_admin", "Password123!");
+        Long adminUserId = userRepository.findByUsername("srv_self_remove_admin").orElseThrow().getId();
+        CreateServerRequestDto serverRequest = new CreateServerRequestDto();
+        serverRequest.setName("Self Remove Server");
+        serverRequest.setType(MessageServerType.ORGANIZATION);
+        HttpResponse<String> serverResponse = post("/api/servers", adminToken, serverRequest);
+        Long serverId = objectMapper.readTree(serverResponse.body()).get("id").asLong();
+
+        String deletePath = "/api/servers/" + serverId + "/members/" + adminUserId;
+        assertEquals(204, delete(deletePath, adminToken).statusCode());
+        assertEquals(204, delete(deletePath, adminToken).statusCode());
     }
 }
