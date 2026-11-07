@@ -29,7 +29,7 @@ if ($LanIp) {
 Write-Host "Creating a development-only self-signed TLS certificate with $san"
 Write-Host "Choose a keystore password when prompted (at least 6 characters)."
 Write-Host "Put exactly that password into TLS_KEYSTORE_PASSWORD in your .env."
-& $keytool -genkeypair -alias ems-backend -keyalg RSA -keysize 3072 `
+& $keytool -genkeypair -alias ems-backend -keyalg EC -groupname secp384r1 -sigalg SHA384withECDSA `
     -storetype PKCS12 -keystore $keystore -validity 90 `
     -dname "CN=localhost, OU=EMS, O=UPCE, C=CZ" -ext $san
 if ($LASTEXITCODE -ne 0) { throw "keytool failed" }

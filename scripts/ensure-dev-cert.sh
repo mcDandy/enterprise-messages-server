@@ -57,7 +57,7 @@ if [ "$host" != localhost ] && [ "$host" != 127.0.0.1 ] && [ "$host" != 10.0.2.2
 fi
 
 echo "Generating DEV-ONLY self-signed TLS certificate for: $san"
-keytool -genkeypair -alias ems-backend -keyalg RSA -keysize 3072 \
+keytool -genkeypair -alias ems-backend -keyalg EC -groupname secp384r1 -sigalg SHA384withECDSA \
   -storetype PKCS12 -keystore "$keystore" -validity 90 \
   -storepass "$pass" -keypass "$pass" \
   -dname 'CN=localhost, OU=EMS, O=UPCE, C=CZ' -ext "$san"
