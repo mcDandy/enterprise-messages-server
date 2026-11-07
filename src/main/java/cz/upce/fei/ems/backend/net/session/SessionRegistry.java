@@ -22,8 +22,7 @@ public class SessionRegistry {
     }
 
     public void unregisterSession(WebSocketSession session) {
-        String username = (String) session.getAttributes().get("username");
-        if (username != null) {
+        if (session.getAttributes().get("username") instanceof String username) {
             activeSessions.remove(username);
             channelMembers.values().forEach(members -> members.remove(username));
         }
