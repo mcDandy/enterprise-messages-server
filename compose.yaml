@@ -91,6 +91,7 @@ services:
         condition: service_healthy
 
   db-test:
+    profiles: ["test"]
     image: ghcr.io/pgmq/pg17-pgmq:v1.10.0
     environment:
       POSTGRES_DB: nnpro_test
@@ -111,6 +112,7 @@ services:
       - "127.0.0.1:${TEST_DB_HOST_PORT:-55432}:5432"
 
   migrate-test:
+    profiles: ["test"]
     image: postgres:17
     environment:
       PGHOST: db-test
