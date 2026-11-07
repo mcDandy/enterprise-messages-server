@@ -3,6 +3,7 @@ package cz.upce.fei.ems.backend.service;
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
+import cz.upce.fei.ems.backend.dto.ChannelResponseDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
 import cz.upce.fei.ems.backend.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,8 +34,6 @@ class ChannelServiceUnitTest {
     private ChannelDeletionService channelDeletionService;
     @Mock
     private KeyRotationService keyRotationService;
-    @Mock
-    private MessageServerRepository messageServerRepository;
 
     @InjectMocks
     private ChannelService channelService;
@@ -57,8 +56,7 @@ class ChannelServiceUnitTest {
     @Test
     void testGetChannelById() {
         when(channelRepository.findById(10L)).thenReturn(Optional.of(channel));
-        Channel found = channelService.getChannelById(10L);
-        assertNotNull(found);
+        ChannelResponseDto found = channelService.getChannelById(10L).orElseThrow();
         assertEquals("general", found.getName());
     }
 
@@ -72,7 +70,7 @@ class ChannelServiceUnitTest {
         when(appUserRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
         when(channelRepository.save(any())).thenReturn(channel);
 
-        Channel created = channelService.createChannel(100L, request, "testuser");
+        ChannelResponseDto created = channelService.createChannel(100L, request, "testuser");
 
         assertNotNull(created);
         verify(channelRepository).save(any());
@@ -84,7 +82,10 @@ class ChannelServiceUnitTest {
     void testCreateChannelForbidden() {
         CreateChannelRequestDto request = new CreateChannelRequestDto();
         when(serverService.isUserAdmin(100L, "testuser")).thenReturn(false);
-        assertThrows(SecurityException.class, () -> channelService.createChannel(100L, request, "testuser"));
+        assertThrows(
+                SecurityException.class
+                , () -> channelService.createChannel(100L, request, "testuser")
+        );
     }
 
     @Test
@@ -96,10 +97,11 @@ class ChannelServiceUnitTest {
         when(serverService.isUserAdmin(100L, "testuser")).thenReturn(true);
         when(channelRepository.save(any())).thenReturn(channel);
 
-        Channel updated = channelService.updateChannel(10L, request, "testuser");
+        ChannelResponseDto updated = channelService
+                .updateChannel(10L, request, "testuser").orElseThrow();
 
         assertNotNull(updated);
-        assertEquals("updated-name", channel.getName());
+        assertEquals("updated-name", updated.getName());
     }
 
     @Test

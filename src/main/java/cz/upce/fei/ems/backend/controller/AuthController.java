@@ -69,8 +69,7 @@ public class AuthController {
     )
     @GetMapping(value = "/public-key/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, String>> getPublicKey(@PathVariable Long id) {
-        String publicKey = authService.getPublicKey(id);
-        return ResponseEntity.ok(Map.of("publicKey", publicKey));
+        return ResponseEntity.ok(authService.getPublicKeyResponse(id));
     }
 
     @Operation(

@@ -1,6 +1,5 @@
 package cz.upce.fei.ems.backend.controller;
 
-import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.dto.ChannelResponseDto;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
@@ -37,15 +36,9 @@ public class ChannelController {
     )
     @GetMapping("/api/servers/{serverId}/channels")
     public ResponseEntity<List<ChannelResponseDto>> getChannels(@PathVariable Long serverId) {
-        List<Channel> channels = channelService.getChannelsByServerId(serverId);
-        if (channels == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        List<ChannelResponseDto> channelDtos = channels.stream()
-                .map(ChannelResponseDto::fromEntity)
-                .toList();
-        return ResponseEntity.ok(channelDtos);
+        return channelService.getChannelsByServerId(serverId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @Operation(
@@ -59,11 +52,9 @@ public class ChannelController {
     )
     @GetMapping("/api/channels/{channelId}")
     public ResponseEntity<ChannelResponseDto> getChannel(@PathVariable Long channelId) {
-        Channel channel = channelService.getChannelById(channelId);
-        if (channel == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(ChannelResponseDto.fromEntity(channel));
+        return channelService.getChannelById(channelId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @Operation(
@@ -82,15 +73,8 @@ public class ChannelController {
             @PathVariable Long serverId,
             @Valid @RequestBody CreateChannelRequestDto request,
             Principal principal) {
-
-        try {
-            Channel savedChannel = channelService.createChannel(serverId, request, principal.getName());
-            return ResponseEntity.status(HttpStatus.CREATED).body(ChannelResponseDto.fromEntity(savedChannel));
-        } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).build();
-        }
+        ChannelResponseDto savedChannel = channelService.createChannel(serverId, request, principal.getName());
+        return ResponseEntity.status(HttpStatus.CREATED).body(savedChannel);
     }
 
     @Operation(
@@ -108,16 +92,9 @@ public class ChannelController {
             @PathVariable Long channelId,
             @Valid @RequestBody UpdateChannelRequestDto request,
             Principal principal) {
-
-        try {
-            Channel updatedChannel = channelService.updateChannel(channelId, request, principal.getName());
-            if (updatedChannel == null) {
-                return ResponseEntity.notFound().build();
-            }
-            return ResponseEntity.ok(ChannelResponseDto.fromEntity(updatedChannel));
-        } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        return channelService.updateChannel(channelId, request, principal.getName())
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @Operation(
@@ -133,13 +110,8 @@ public class ChannelController {
     public ResponseEntity<Void> deleteChannel(
             @PathVariable Long channelId,
             Principal principal) {
-
-        try {
-            channelService.deleteChannel(channelId, principal.getName());
-            return ResponseEntity.noContent().build();
-        } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        channelService.deleteChannel(channelId, principal.getName());
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(
@@ -155,15 +127,6 @@ public class ChannelController {
     public ResponseEntity<List<ChannelResponseDto>> getMyChannelsForServer(
             @PathVariable Long serverId,
             Principal principal) {
-
-        try {
-            List<ChannelResponseDto> channels = channelService.getMyChannelsForServer(serverId, principal.getName())
-                    .stream()
-                    .map(ChannelResponseDto::fromEntity)
-                    .toList();
-            return ResponseEntity.ok(channels);
-        } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        return ResponseEntity.ok(channelService.getMyChannelsForServer(serverId, principal.getName()));
     }
 }

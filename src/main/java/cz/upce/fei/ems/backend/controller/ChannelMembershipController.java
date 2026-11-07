@@ -2,7 +2,6 @@ package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.dto.AddChannelMemberRequestDto;
 import cz.upce.fei.ems.backend.dto.ChannelMemberResponseDto;
-import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.service.ChannelMembershipService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -24,7 +23,6 @@ import java.util.List;
 public class ChannelMembershipController {
 
     private final ChannelMembershipService channelMembershipService;
-    private final ChannelMemberRepository channelMemberRepository;
 
     @Operation(
             summary = "Get channel members",
@@ -36,10 +34,7 @@ public class ChannelMembershipController {
     )
     @GetMapping
     public ResponseEntity<List<ChannelMemberResponseDto>> getChannelMembers(@PathVariable Long channelId) {
-        List<ChannelMemberResponseDto> members = channelMemberRepository.findByChannelId(channelId).stream()
-                .map(ChannelMemberResponseDto::fromEntity)
-                .toList();
-        return ResponseEntity.ok(members);
+        return ResponseEntity.ok(channelMembershipService.getChannelMembers(channelId));
     }
 
     @Operation(
@@ -57,8 +52,7 @@ public class ChannelMembershipController {
             @PathVariable Long channelId,
             @Valid @RequestBody AddChannelMemberRequestDto request,
             Principal principal) {
-        channelMembershipService.addMemberToChannel(channelId, request.getUserId(), principal.getName());
-        channelMembershipService.triggerKeyRotation(channelId);
+        channelMembershipService.addMemberAndTriggerKeyRotation(channelId, request.getUserId(), principal.getName());
         return ResponseEntity.ok().build();
     }
 
@@ -76,13 +70,7 @@ public class ChannelMembershipController {
             @PathVariable Long channelId,
             @PathVariable Long userId,
             Principal principal) {
-        try {
-            if (channelMembershipService.removeMemberFromChannel(channelId, userId, principal.getName())) {
-                channelMembershipService.triggerKeyRotation(channelId);
-            }
-            return ResponseEntity.noContent().build();
-        } catch (SecurityException e) {
-            return ResponseEntity.status(403).build();
-        }
+        channelMembershipService.removeMemberFromChannel(channelId, userId, principal.getName());
+        return ResponseEntity.noContent().build();
     }
 }

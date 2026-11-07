@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -95,6 +97,10 @@ public class AuthService {
                         HttpStatus.NOT_FOUND, "Active public key not found"
                 ))
                 .getPublicKey();
+    }
+
+    public Map<String, String> getPublicKeyResponse(Long id) {
+        return Map.of("publicKey", getPublicKey(id));
     }
 
     public AuthResponseDto refreshToken(RefreshTokenRequestDto request) {

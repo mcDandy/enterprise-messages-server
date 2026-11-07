@@ -51,20 +51,26 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({AuthenticationException.class, BadCredentialsException.class})
-    public ResponseEntity<String> handleAuthenticationException(Exception ex) {
+    public ResponseEntity<String> handleAuthenticationException() {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body("Invalid credentials or invalid token.");
     }
 
     @ExceptionHandler({AccessDeniedException.class, AuthorizationDeniedException.class})
-    public ResponseEntity<String> handleAccessDenied(AccessDeniedException ex) {
+    public ResponseEntity<String> handleAccessDenied() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body("Access denied.");
+    }
+
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<String> handleSecurityException() {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body("Access denied.");
     }
 
     @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<String> handleRuntime(RuntimeException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body("Something went wrong: " + ex.getMessage());
+    public ResponseEntity<String> handleRuntime() {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Internal server error.");
     }
 }

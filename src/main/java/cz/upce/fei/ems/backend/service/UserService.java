@@ -50,6 +50,14 @@ public class UserService {
         return userKeyRepository.findByUserIdAndRevokedAtIsNull(userId);
     }
 
+    public Optional<UserResponseDto> getUserResponse(AppUser user) {
+        return Optional.ofNullable(user).map(this::mapToUserResponse);
+    }
+
+    public Optional<UserKeyResponseDto> getActivePublicKeyResponse(Long userId) {
+        return getActivePublicKeyForUser(userId).map(this::mapToKeyResponse);
+    }
+
     public UserResponseDto mapToUserResponse(AppUser user) {
         return UserResponseDto.builder()
                 .id(user.getId())

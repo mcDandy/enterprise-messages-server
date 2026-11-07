@@ -3,12 +3,15 @@ package cz.upce.fei.ems.backend.service;
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.MessageServerMember;
 import cz.upce.fei.ems.backend.domain.MessageServerRole;
+import cz.upce.fei.ems.backend.dto.ServerMemberResponseDto;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.MessageServerRepository;
 import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +21,12 @@ public class ServerMembershipService {
     private final AppUserRepository appUserRepository;
     private final MessageServerRepository messageServerRepository;
     private final MessageServerService serverService;
+
+    public List<ServerMemberResponseDto> getServerMembers(Long serverId) {
+        return serverMemberRepository.findByServerId(serverId).stream()
+                .map(ServerMemberResponseDto::fromEntity)
+                .toList();
+    }
 
     @Transactional
     public void addMemberToServer(Long serverId, Long targetUserId, MessageServerRole role, String adminUsername) {
@@ -42,15 +51,15 @@ public class ServerMembershipService {
     }
 
     @Transactional
-    public boolean removeMemberFromServer(Long serverId, Long targetUserId, String adminUsername) {
+    public void removeMemberFromServer(Long serverId, Long targetUserId, String adminUsername) {
         if (!messageServerRepository.existsById(serverId)) {
-            return false;
+            return;
         }
 
         MessageServerMember member = serverMemberRepository.findByServerIdAndUserId(serverId, targetUserId)
                 .orElse(null);
         if (member == null) {
-            return false;
+            return;
         }
 
         if (!serverService.isUserAdmin(serverId, adminUsername)) {
@@ -58,7 +67,6 @@ public class ServerMembershipService {
         }
 
         serverMemberRepository.delete(member);
-        return true;
     }
 
     @Transactional

@@ -1,6 +1,9 @@
 package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.*;
+import cz.upce.fei.ems.backend.dto.CreateServerRequestDto;
+import cz.upce.fei.ems.backend.dto.ServerResponseDto;
+import cz.upce.fei.ems.backend.dto.UpdateServerRequestDto;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelRepository;
 import cz.upce.fei.ems.backend.repository.MessageServerRepository;
@@ -10,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +25,7 @@ public class MessageServerService {
     private final ChannelRepository channelRepository;
     private final ChannelDeletionService channelDeletionService;
 
-    public List<MessageServer> getServersForUser(String username) {
+    public List<ServerResponseDto> getServersForUser(String username) {
         AppUser user = appUserRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -30,17 +34,19 @@ public class MessageServerService {
                 .map(MessageServerMember::getServerId)
                 .toList();
 
-        return serverRepository.findAllById(serverIds);
+        return serverRepository.findAllById(serverIds).stream()
+                .map(ServerResponseDto::fromEntity)
+                .toList();
     }
 
     @Transactional
-    public MessageServer createServer(String serverName, MessageServerType type, String username) {
+    public ServerResponseDto createServer(CreateServerRequestDto request, String username) {
         AppUser user = appUserRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         MessageServer server = new MessageServer();
-        server.setName(serverName);
-        server.setType(type);
+        server.setName(request.getName());
+        server.setType(request.getType());
         MessageServer savedServer = serverRepository.save(server);
 
         // Creator automatically becomes an ADMIN of the server
@@ -50,7 +56,35 @@ public class MessageServerService {
         member.setRole(MessageServerRole.ADMINISTRATOR);
         serverMemberRepository.save(member);
 
-        return savedServer;
+        return ServerResponseDto.fromEntity(savedServer);
+    }
+
+    public Optional<ServerResponseDto> getServer(Long serverId) {
+        return serverRepository.findById(serverId).map(ServerResponseDto::fromEntity);
+    }
+
+    @Transactional
+    public Optional<ServerResponseDto> updateServer(
+            Long serverId, UpdateServerRequestDto request, String username) {
+        validateServerAdmin(serverId, username);
+        MessageServer server = serverRepository.findById(serverId).orElse(null);
+        if (server == null) {
+            return Optional.empty();
+        }
+
+        server.setName(request.getName());
+        return Optional.of(ServerResponseDto.fromEntity(serverRepository.save(server)));
+    }
+
+    public List<ServerResponseDto> getMyServers(String username) {
+        AppUser user = appUserRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        List<Long> serverIds = serverMemberRepository.findByUserId(user.getId()).stream()
+                .map(MessageServerMember::getServerId)
+                .toList();
+        return serverRepository.findAllById(serverIds).stream()
+                .map(ServerResponseDto::fromEntity)
+                .toList();
     }
 
     @Transactional

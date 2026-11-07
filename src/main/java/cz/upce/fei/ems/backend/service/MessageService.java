@@ -2,13 +2,18 @@ package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.Message;
+import cz.upce.fei.ems.backend.dto.MessageResponseDto;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
+import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
 import cz.upce.fei.ems.backend.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -16,6 +21,26 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final AppUserRepository appUserRepository;
+    private final ChannelKeyRepository channelKeyRepository;
+
+    public List<MessageResponseDto> getRecentMessages(Long channelId) {
+        return messageRepository.findTop50ByChannelIdOrderBySentAtDescIdDesc(channelId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public Slice<MessageResponseDto> getMessagesPage(Long channelId, Pageable pageable) {
+        return messageRepository.findByChannelId(channelId, pageable).map(this::toResponse);
+    }
+
+    private MessageResponseDto toResponse(Message message) {
+        MessageResponseDto response = MessageResponseDto.fromEntity(message);
+        response.setKeyVersion(channelKeyRepository.findById(message.getChannelKeyId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Missing key version for message " + message.getId()))
+                .getVersion());
+        return response;
+    }
 
     @Transactional
     public void processAndSaveMessage(String senderUsername, Long channelId, Long channelKeyId, byte[] ciphertext) {

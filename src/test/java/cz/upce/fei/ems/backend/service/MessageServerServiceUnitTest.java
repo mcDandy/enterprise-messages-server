@@ -1,6 +1,7 @@
 package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.*;
+import cz.upce.fei.ems.backend.dto.CreateServerRequestDto;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelRepository;
 import cz.upce.fei.ems.backend.repository.MessageServerRepository;
@@ -51,10 +52,13 @@ class MessageServerServiceUnitTest {
 
     @Test
     void testCreateServerSuccess() {
+        CreateServerRequestDto request = new CreateServerRequestDto();
+        request.setName("test-server");
+        request.setType(MessageServerType.ORGANIZATION);
         when(appUserRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
         when(serverRepository.save(any())).thenReturn(server);
 
-        MessageServer created = messageServerService.createServer("test-server", MessageServerType.ORGANIZATION, "testuser");
+        var created = messageServerService.createServer(request, "testuser");
 
         assertNotNull(created);
         verify(serverRepository).save(any());

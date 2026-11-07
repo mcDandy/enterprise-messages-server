@@ -1,6 +1,7 @@
 package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.*;
+import cz.upce.fei.ems.backend.dto.ChannelMemberResponseDto;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.ChannelRepository;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -23,6 +25,11 @@ public class ChannelMembershipService {
     private final KeyRotationService keyRotationService;
     private final ServerMemberRepository serverMemberRepository;
 
+    public List<ChannelMemberResponseDto> getChannelMembers(Long channelId) {
+        return channelMemberRepository.findByChannelId(channelId).stream()
+                .map(ChannelMemberResponseDto::fromEntity)
+                .toList();
+    }
 
     @Transactional
     public void addMemberToChannel(Long channelId, Long targetUserId, String adminUsername) {
@@ -58,16 +65,22 @@ public class ChannelMembershipService {
     }
 
     @Transactional
-    public boolean removeMemberFromChannel(Long channelId, Long targetUserId, String adminUsername) {
+    public void addMemberAndTriggerKeyRotation(Long channelId, Long targetUserId, String adminUsername) {
+        addMemberToChannel(channelId, targetUserId, adminUsername);
+        triggerKeyRotation(channelId);
+    }
+
+    @Transactional
+    public void removeMemberFromChannel(Long channelId, Long targetUserId, String adminUsername) {
         Channel channel = channelRepository.findById(channelId).orElse(null);
         if (channel == null) {
-            return false;
+            return;
         }
 
         ChannelMemberId memberId = new ChannelMemberId(channelId, targetUserId);
         ChannelMember member = channelMemberRepository.findById(memberId).orElse(null);
         if (member == null) {
-            return false;
+            return;
         }
 
         if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
@@ -76,7 +89,6 @@ public class ChannelMembershipService {
 
         channelMemberRepository.delete(member);
         channelMemberRepository.flush();
-        return true;
     }
 
     @Transactional

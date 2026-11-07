@@ -32,10 +32,9 @@ public class UserController {
     )
     @GetMapping("/me")
     public ResponseEntity<UserResponseDto> getCurrentUser(@AuthenticationPrincipal AppUser user) {
-        if (user == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(userService.mapToUserResponse(user));
+        return userService.getUserResponse(user)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @Operation(
@@ -78,8 +77,8 @@ public class UserController {
     )
     @GetMapping("/{userId}/key")
     public ResponseEntity<UserKeyResponseDto> getUserPublicKey(@PathVariable Long userId) {
-        return userService.getActivePublicKeyForUser(userId)
-                .map(key -> ResponseEntity.ok(userService.mapToKeyResponse(key)))
+        return userService.getActivePublicKeyResponse(userId)
+                .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 }
