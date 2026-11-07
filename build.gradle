@@ -57,4 +57,5 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	environment 'SWAGGER_PASSWORD', 'test-swagger-password'
 }

@@ -6,7 +6,7 @@ Spring Boot (Java 21), PostgreSQL 17, Docker Compose, HTTPS/WSS.
 
 Install Docker with Compose. Copy `.env.example` to `.env` (`Copy-Item .env.example .env`
 on Windows PowerShell, `cp .env.example .env` on Linux) and set `DB_PASSWORD`,
-`JWT_SECRET` and `TLS_KEYSTORE_PASSWORD`.
+`JWT_SECRET`, `SWAGGER_PASSWORD` and `TLS_KEYSTORE_PASSWORD` to your own values.
 
 ```sh
 docker compose up -d --build
@@ -15,6 +15,8 @@ docker compose up -d --build
 Starts PostgreSQL, creates a development TLS certificate on first run and
 starts the backend at `https://localhost:8443`. Logs:
 `docker compose logs -f backend`.
+Swagger UI is at `https://localhost:8443/swagger-ui/index.html`; sign in with
+username `swagger` and the `SWAGGER_PASSWORD` value from `.env`.
 
 ## Development mode: hot reload and demo data
 
