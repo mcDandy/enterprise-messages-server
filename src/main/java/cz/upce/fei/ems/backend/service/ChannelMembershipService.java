@@ -1,6 +1,7 @@
 package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.*;
+import cz.upce.fei.ems.backend.dto.ChannelMemberResponseDto;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.ChannelRepository;
@@ -8,8 +9,8 @@ import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Objects;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -24,52 +25,79 @@ public class ChannelMembershipService {
     private final KeyRotationService keyRotationService;
     private final ServerMemberRepository serverMemberRepository;
 
+    public List<ChannelMemberResponseDto> getChannelMembers(Long channelId) {
+        return channelMemberRepository.findByChannelId(channelId).stream()
+                .map(ChannelMemberResponseDto::fromEntity)
+                .toList();
+    }
 
     @Transactional
     public void addMemberToChannel(Long channelId, Long targetUserId, String adminUsername) {
+        Channel channel = findAuthorizedChannel(channelId, adminUsername);
+        validateTargetMembership(channelId, targetUserId);
+        ensureServerMembership(channel, targetUserId);
+        saveChannelMembership(channelId, targetUserId);
+    }
+
+    private Channel findAuthorizedChannel(Long channelId, String adminUsername) {
         Channel channel = channelRepository.findById(channelId)
                 .orElseThrow(() -> new IllegalArgumentException("Channel not found"));
-
         if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
             throw new SecurityException("Only server administrators can manage channel memberships.");
         }
+        return channel;
+    }
 
+    private void validateTargetMembership(Long channelId, Long targetUserId) {
         if (!appUserRepository.existsById(targetUserId)) {
             throw new IllegalArgumentException("Target user with ID " + targetUserId + " not found");
         }
-
         if (channelMemberRepository.existsByChannelIdAndUserId(channelId, targetUserId)) {
             throw new IllegalStateException("User is already a member of this channel.");
         }
+    }
 
-        if (!serverMemberRepository.existsByServerIdAndUserId(channel.getServerId(), targetUserId)) {
-            MessageServerMember serverMember = new MessageServerMember();
-            serverMember.setServerId(channel.getServerId());
-            serverMember.setUserId(targetUserId);
-            serverMember.setRole(MessageServerRole.MEMBER);
-            serverMemberRepository.save(serverMember);
+    private void ensureServerMembership(Channel channel, Long targetUserId) {
+        if (serverMemberRepository.existsByServerIdAndUserId(channel.getServerId(), targetUserId)) {
+            return;
         }
+        MessageServerMember serverMember = new MessageServerMember();
+        serverMember.setServerId(channel.getServerId());
+        serverMember.setUserId(targetUserId);
+        serverMember.setRole(MessageServerRole.MEMBER);
+        serverMemberRepository.save(serverMember);
+    }
 
+    private void saveChannelMembership(Long channelId, Long targetUserId) {
         ChannelMember member = new ChannelMember();
         member.setChannelId(channelId);
         member.setUserId(targetUserId);
-
         channelMemberRepository.save(member);
         channelMemberRepository.flush();
     }
 
     @Transactional
+    public void addMemberAndTriggerKeyRotation(Long channelId, Long targetUserId, String adminUsername) {
+        addMemberToChannel(channelId, targetUserId, adminUsername);
+        triggerKeyRotation(channelId);
+    }
+
+    @Transactional
     public void removeMemberFromChannel(Long channelId, Long targetUserId, String adminUsername) {
-        Channel channel = channelRepository.findById(channelId)
-                .orElseThrow(() -> new IllegalArgumentException("Channel not found"));
+        Channel channel = channelRepository.findById(channelId).orElse(null);
+        if (channel == null) {
+            return;
+        }
+
+        ChannelMemberId memberId = new ChannelMemberId(channelId, targetUserId);
+        ChannelMember member = channelMemberRepository.findById(memberId).orElse(null);
+        if (member == null) {
+            return;
+        }
 
         if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
             throw new SecurityException("Only server administrators can manage channel memberships.");
         }
-
-        ChannelMemberId memberId = new ChannelMemberId(channelId, targetUserId);
-        ChannelMember member = channelMemberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("Channel member not found"));
 
         channelMemberRepository.delete(member);
         channelMemberRepository.flush();

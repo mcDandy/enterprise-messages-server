@@ -24,8 +24,7 @@ public class PacketWebSocketHandler extends BinaryWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        String username = (String) session.getAttributes().get("username");
-        if (username != null) {
+        if (session.getAttributes().get("username") instanceof String username) {
             sessionRegistry.registerSession(username, session);
             keyRotationService.processPendingOnConnect(username, session);
 

@@ -10,6 +10,10 @@ import org.springframework.data.repository.query.Param;
 public interface MessageReceiptRepository extends JpaRepository<MessageReceipt, MessageReceiptId> {
 
     @Modifying
+    @Query("delete from MessageReceipt receipt where receipt.messageChannelId = :channelId")
+    void deleteByMessageChannelId(@Param("channelId") Long channelId);
+
+    @Modifying
     @Query(value = """
         INSERT INTO message_receipt
             (message_channel_id, user_id, last_delivered_message_id, last_read_message_id)

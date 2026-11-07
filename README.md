@@ -6,7 +6,7 @@ Spring Boot (Java 21), PostgreSQL 17 + PGMQ, Docker Compose, HTTPS/WSS.
 
 Install Docker with Compose. Copy `.env.example` to `.env` (`Copy-Item .env.example .env`
 on Windows PowerShell, `cp .env.example .env` on Linux) and set `DB_PASSWORD`,
-`JWT_SECRET` and `TLS_KEYSTORE_PASSWORD`.
+`JWT_SECRET`, `SWAGGER_PASSWORD` and `TLS_KEYSTORE_PASSWORD` to your own values.
 
 ```sh
 docker compose up -d --build
@@ -15,6 +15,8 @@ docker compose up -d --build
 Starts PostgreSQL, creates a development TLS certificate on first run and
 starts the backend at `https://localhost:8443`. Logs:
 `docker compose logs -f backend`.
+Swagger UI is at `https://localhost:8443/swagger-ui/index.html`; sign in with
+username `swagger` and the `SWAGGER_PASSWORD` value from `.env`.
 
 ## Development mode: hot reload and demo data
 
@@ -46,16 +48,53 @@ require the dev override.
 
 ## Tests
 
-```sh
-docker compose -p nnpro-tests --profile test run --rm --build tests
+### Run functional tests from IntelliJ with Docker PostgreSQL
+
+Start the normal Compose stack. It includes a separate PostgreSQL test
+database on `localhost:55432` and a migration service that prepares its schema:
+
+```powershell
+docker compose up -d --wait
 ```
 
-Tests use a separate PGMQ-enabled database (`nnpro_test`). The Gradle suite also
-runs `PostgresKeyQueueIntegrationTest` against the real database (enqueue, claim,
-recipient/channel filtering, visibility timeout and acknowledgment). It rejects
-other database names to avoid writing test packets into application data.
-Remove the test containers **and the isolated test volume** afterwards with
-`docker compose -p nnpro-tests --profile test down --volumes`.
+In IntelliJ, run tests with the Gradle test runner; test configuration defaults
+to `jdbc:postgresql://localhost:55432/nnpro_test`, user `nnpro`, password
+`nnpro_local_test`. Override these with `TEST_DB_URL`, `TEST_DB_USERNAME`, and
+`TEST_DB_PASSWORD` if needed. The test database is separate from the backend's
+`nnpro` database and must only contain disposable test data.
+
+The test database uses PostgreSQL 17 + PGMQ. The test migration runner brings
+older schemas up to migration 005; the Gradle suite includes
+`PostgresKeyQueueIntegrationTest`, which uses the real database to verify
+enqueue, filtered reads, visibility timeouts, and acknowledgments. The test
+refuses to run against database names other than `nnpro_test`.
+
+WebSocket integration tests verify key-rotation delivery through authenticated sessions.
+To run the unicast rotation test only:
+
+```powershell
+.\gradlew.bat test --tests "*UnicastKeyRotationWssIntegrationTest"
+```
+
+### Run tests with Docker Compose
+
+```sh
+docker compose --profile test run --rm --build tests
+```
+
+Docker Compose starts `db-test`, applies required migrations through
+`migrate-test`, and then runs the Gradle suite. For an isolated test project,
+use `-p nnpro-gradle-check`, optionally set a free `TEST_DB_HOST_PORT`, and
+remove that project's containers and volumes after testing:
+
+```powershell
+$env:TEST_DB_HOST_PORT = "55434"
+docker compose -p nnpro-gradle-check --profile test run --build --rm tests
+docker compose -p nnpro-gradle-check --profile test down --volumes
+```
+
+Do not run `down --volumes` on your ordinary development Compose project:
+that could also delete its persistent application database.
 
 ## Existing database upgrade
 
@@ -106,7 +145,6 @@ docker compose -p firma_b --env-file .env.firma_b up -d --build
 
 Each installation has its own PostgreSQL volume and Docker network.
 The optional `compose.dev.yaml` provides a Gradle `bootRun` development setup.
-Firebase push notifications are not available.
 
 The Compose commands are cross-platform. On Linux with SELinux (e.g. Fedora),
 bind-mount permissions may require additional configuration.

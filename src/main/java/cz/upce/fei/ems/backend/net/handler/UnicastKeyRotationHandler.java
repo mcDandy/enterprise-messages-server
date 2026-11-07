@@ -32,36 +32,76 @@ public class UnicastKeyRotationHandler implements PacketHandler {
         log.info("Handling UNICAST_KEY_ROTATION packet for session ID: {}", session.getId());
 
         byte[] payload = packet.getPayload();
+        if (!isValidPayload(session, payload)) {
+            return;
+        }
+
+        AuthenticatedSender authenticatedSender = findAuthenticatedSender(session);
+        if (authenticatedSender == null) {
+            return;
+        }
+
+        UnicastRotationRequest request = parseRequest(payload);
+        if (isSelfRotation(session, authenticatedSender, request.recipientUserId())) {
+            return;
+        }
+
+        delegateRotation(authenticatedSender, request);
+    }
+
+    private void delegateRotation(AuthenticatedSender sender, UnicastRotationRequest request) {
+        log.info(
+                "Delegating client unicast rotation: sender '{}' (ID: {}) -> recipient ID {} in channel {}",
+                sender.username(),
+                sender.user().getId(),
+                request.recipientUserId(),
+                request.channelId()
+        );
+        keyRotationService.handleClientUnicastRotation(
+                request.channelId(),
+                sender.user().getId(),
+                sender.username(),
+                request.recipientUserId(),
+                request.ciphertext()
+        );
+    }
+
+    private boolean isValidPayload(WebSocketSession session, byte[] payload) throws Exception {
         if (payload == null || payload.length < 9) {
             log.warn("Invalid unicast rotation payload length: {}", payload != null ? payload.length : 0);
             dispatcher.sendError(session, "Invalid unicast rotation payload.");
-            return;
+            return false;
         }
         log.info("Payload received successfully, size: {} bytes", payload.length);
+        return true;
+    }
 
-        Object usernameAttr = session.getAttributes().get("username");
-        if (!(usernameAttr instanceof String senderUsername)) {
+    private AuthenticatedSender findAuthenticatedSender(WebSocketSession session) throws Exception {
+        Object usernameAttribute = session.getAttributes().get("username");
+        if (!(usernameAttribute instanceof String username)) {
             log.warn(
                     "Unauthorized connection attempt: " +
                             "'username' session attribute is missing or not a String (found: {})",
-                    usernameAttr
+                    usernameAttribute
             );
             dispatcher.sendError(session, "Unauthorized connection.");
-            return;
+            return null;
         }
 
-        if (appUserRepository.findByUsername(senderUsername).isEmpty()) {
-            log.warn("User '{}' found in session attributes, but does not exist in database.", senderUsername);
+        AppUser sender = appUserRepository.findByUsername(username).orElse(null);
+        if (sender == null) {
+            log.warn("User '{}' found in session attributes, but does not exist in database.", username);
             dispatcher.sendError(session, "Unauthorized connection.");
-            return;
+            return null;
         }
-        AppUser appUser = appUserRepository.findByUsername(senderUsername).get();
-        log.info("Authenticated sender resolved: {} (ID: {})", senderUsername, appUser.getId());
+        log.info("Authenticated sender resolved: {} (ID: {})", username, sender.getId());
+        return new AuthenticatedSender(username, sender);
+    }
 
+    private UnicastRotationRequest parseRequest(byte[] payload) {
         ByteBuffer buffer = ByteBuffer.wrap(payload);
         long recipientUserId = buffer.getLong();
         long channelId = buffer.getLong();
-
         byte[] ciphertext = new byte[buffer.remaining()];
         buffer.get(ciphertext);
         log.info(
@@ -69,28 +109,27 @@ public class UnicastKeyRotationHandler implements PacketHandler {
                 recipientUserId,
                 ciphertext.length
         );
+        return new UnicastRotationRequest(recipientUserId, channelId, ciphertext);
+    }
 
-        if (appUser.getId() == recipientUserId) {
-            log.warn(
-                    "User '{}' (ID: {}) " +
-                            "attempted to send unicast key rotation to themselves (recipient ID matches sender).",
-                    senderUsername,
-                    appUser.getId()
-            );
-            dispatcher.sendError(session, "You are sending key to yourself");
-            return;
+    private boolean isSelfRotation(
+            WebSocketSession session, AuthenticatedSender sender, long recipientUserId
+    ) throws Exception {
+        if (sender.user().getId() != recipientUserId) {
+            return false;
         }
-
-        log.info(
-                "Delegating client unicast rotation: sender '{}' (ID: {}) -> recipient ID {} in channel {}",
-                senderUsername,
-                appUser.getId(),
-                recipientUserId,
-                channelId
+        log.warn(
+                "User '{}' (ID: {}) attempted to send unicast key rotation to themselves (recipient ID matches sender).",
+                sender.username(),
+                sender.user().getId()
         );
+        dispatcher.sendError(session, "You are sending key to yourself");
+        return true;
+    }
 
-        keyRotationService.handleClientUnicastRotation(
-                channelId, appUser.getId(), senderUsername, recipientUserId, ciphertext
-        );
+    private record AuthenticatedSender(String username, AppUser user) {
+    }
+
+    private record UnicastRotationRequest(long recipientUserId, long channelId, byte[] ciphertext) {
     }
 }

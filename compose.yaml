@@ -40,6 +40,7 @@ services:
       DB_USERNAME: ${DB_USERNAME:-nnpro}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      SWAGGER_PASSWORD: ${SWAGGER_PASSWORD:?Set SWAGGER_PASSWORD in .env}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
       SERVER_PORT: 8443
       SERVER_SSL_ENABLED: "true"
@@ -91,7 +92,6 @@ services:
 
   db-test:
     image: ghcr.io/pgmq/pg17-pgmq:v1.10.0
-    profiles: ["test"]
     environment:
       POSTGRES_DB: nnpro_test
       POSTGRES_USER: nnpro
@@ -99,6 +99,8 @@ services:
     volumes:
       - pgmq_test_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    # Keep this readiness check schema-agnostic: migrate-test applies 001-005
+    # only *after* db-test is healthy. Checking pending tables here deadlocks it.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nnpro -d nnpro_test"]
       interval: 5s
@@ -107,6 +109,28 @@ services:
     # Only for devs who run tests from IntelliJ on Windows
     ports:
       - "127.0.0.1:${TEST_DB_HOST_PORT:-55432}:5432"
+
+  migrate-test:
+    image: postgres:17
+    environment:
+      PGHOST: db-test
+      PGDATABASE: nnpro_test
+      PGUSER: nnpro
+      PGPASSWORD: ${TEST_DB_PASSWORD:-nnpro_local_test}
+    volumes:
+      - ./database/migrations:/migrations:ro
+      - ./scripts/migrate-db.sh:/migrate-db.sh:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        until pg_isready -h "$${PGHOST}" -U "$${PGUSER}" -d "$${PGDATABASE}";
+        do sleep 1; done;
+        exec /bin/sh /migrate-db.sh
+    depends_on:
+      db-test:
+        condition: service_started
+    restart: "no"
 
   tests:
     profiles: ["test"]
@@ -118,10 +142,15 @@ services:
       DB_URL: jdbc:postgresql://db-test:5432/nnpro_test
       DB_USERNAME: nnpro
       DB_PASSWORD: ${TEST_DB_PASSWORD:-nnpro_local_test}
+      TEST_DB_URL: jdbc:postgresql://db-test:5432/nnpro_test
+      TEST_DB_USERNAME: nnpro
+      TEST_DB_PASSWORD: ${TEST_DB_PASSWORD:-nnpro_local_test}
     command: ["./gradlew", "test", "--no-daemon"]
     depends_on:
       db-test:
         condition: service_healthy
+      migrate-test:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

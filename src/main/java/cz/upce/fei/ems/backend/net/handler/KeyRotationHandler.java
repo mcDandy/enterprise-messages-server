@@ -22,14 +22,12 @@ public class KeyRotationHandler implements PacketHandler {
 
     @Override
     public void handle(WebSocketSession session, Packet packet) throws Exception {
-        String senderUsername = (String) session.getAttributes().get("username");
-        if (senderUsername == null) {
+        if (!(session.getAttributes().get("username") instanceof String senderUsername)) {
             dispatcher.sendError(session, "Unauthorized connection.");
             return;
         }
 
-        Long channelId = (Long) session.getAttributes().get("currentChannelId");
-        if (channelId == null) {
+        if (!(session.getAttributes().get("currentChannelId") instanceof Long channelId)) {
             dispatcher.sendError(session, "User is not in an active channel.");
             return;
         }

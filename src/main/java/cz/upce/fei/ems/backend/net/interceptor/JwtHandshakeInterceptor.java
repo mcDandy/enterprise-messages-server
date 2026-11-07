@@ -23,49 +23,52 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
     @Override
     public boolean beforeHandshake(
-            ServerHttpRequest request,
+            @NonNull ServerHttpRequest request,
             @NonNull ServerHttpResponse response,
             @NonNull WebSocketHandler wsHandler,
             @NonNull Map<String, Object> attributes
     ) {
-
-        String authHeader = request.getHeaders().getFirst("Authorization");
-        String token = null;
-
-        if (authHeader != null && authHeader.startsWith("Bearer ") && authHeader.length() > 7) {
-            token = authHeader.substring(7);
-        }
-
-        if (
-                token == null
-                        && request instanceof org.springframework.http.server.ServletServerHttpRequest servletRequest
-        ) {
-            token = servletRequest.getServletRequest().getParameter("token");
-        }
-
+        String token = extractToken(request);
         if (token == null) {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;
         }
 
         try {
-            String username = jwtService.extractUsername(token);
-            if (username != null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-                if (jwtService.isTokenValid(token, userDetails)) {
-                    attributes.put("username", username);
-                    return true;
-                }
+            if (authenticateToken(token, attributes)) {
+                return true;
             }
-
-            response.setStatusCode(HttpStatus.UNAUTHORIZED);
-            return false;
-
         } catch (Exception e) {
-            response.setStatusCode(HttpStatus.UNAUTHORIZED);
+            // Invalid or expired credentials are rejected below.
+        }
+        response.setStatusCode(HttpStatus.UNAUTHORIZED);
+        return false;
+    }
+
+    private String extractToken(ServerHttpRequest request) {
+        String authHeader = request.getHeaders().getFirst("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ") && authHeader.length() > 7) {
+            return authHeader.substring(7);
+        }
+
+        if (request instanceof org.springframework.http.server.ServletServerHttpRequest servletRequest) {
+            return servletRequest.getServletRequest().getParameter("token");
+        }
+        return null;
+    }
+
+    private boolean authenticateToken(String token, Map<String, Object> attributes) {
+        String username = jwtService.extractUsername(token);
+        if (username == null) {
             return false;
         }
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        if (!jwtService.isTokenValid(token, userDetails)) {
+            return false;
+        }
+        attributes.put("username", username);
+        return true;
     }
 
     @Override

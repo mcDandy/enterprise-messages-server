@@ -1,10 +1,8 @@
 package cz.upce.fei.ems.backend.controller;
 
-import cz.upce.fei.ems.backend.domain.MessageServerRole;
 import cz.upce.fei.ems.backend.dto.AddMemberRequestDto;
 import cz.upce.fei.ems.backend.dto.ServerMemberResponseDto;
 import cz.upce.fei.ems.backend.dto.UpdateMemberRoleRequestDto;
-import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import cz.upce.fei.ems.backend.service.ServerMembershipService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -26,7 +24,6 @@ import java.util.List;
 public class ServerMembershipController {
 
     private final ServerMembershipService membershipService;
-    private final ServerMemberRepository serverMemberRepository;
 
     @Operation(
             summary = "List server members",
@@ -37,10 +34,7 @@ public class ServerMembershipController {
     )
     @GetMapping
     public ResponseEntity<List<ServerMemberResponseDto>> getMembers(@PathVariable Long serverId) {
-        List<ServerMemberResponseDto> members = serverMemberRepository.findByServerId(serverId).stream()
-                .map(ServerMemberResponseDto::fromEntity)
-                .toList();
-        return ResponseEntity.ok(members);
+        return ResponseEntity.ok(membershipService.getServerMembers(serverId));
     }
 
     @Operation(
@@ -57,17 +51,16 @@ public class ServerMembershipController {
             @Valid @RequestBody AddMemberRequestDto request,
             Principal principal) {
 
-        MessageServerRole role = request.getRole() != null ? request.getRole() : MessageServerRole.MEMBER;
-        membershipService.addMemberToServer(serverId, request.getUserId(), role, principal.getName());
+        membershipService.addMemberToServer(serverId, request.getUserId(), request.getRole(), principal.getName());
         return ResponseEntity.ok().build();
     }
 
     @Operation(
             summary = "Remove member from server (Admin only)",
             responses = {
-                    @ApiResponse(responseCode = "204", description = "Member removed successfully"),
-                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content),
-                    @ApiResponse(responseCode = "404", description = "Member not found", content = @Content)
+                    @ApiResponse(responseCode = "204",
+                            description = "Removal completed; succeeds if the membership was already absent"),
+                    @ApiResponse(responseCode = "403", description = "Not authorized", content = @Content)
             }
     )
     @DeleteMapping("/{userId}")

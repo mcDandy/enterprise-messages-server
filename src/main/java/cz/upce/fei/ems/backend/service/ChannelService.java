@@ -3,6 +3,7 @@ package cz.upce.fei.ems.backend.service;
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.domain.ChannelMember;
+import cz.upce.fei.ems.backend.dto.ChannelResponseDto;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.UserKeyResponseDto;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -24,29 +26,34 @@ public class ChannelService {
     private final AppUserRepository appUserRepository;
     private final ServerMemberRepository serverMemberRepository;
     private final MessageServerService serverService;
+    private final ChannelDeletionService channelDeletionService;
     private final KeyRotationService keyRotationService;
     private final UserKeyRepository userKeyRepository;
     private final MessageServerRepository messageServerRepository;
 
-    public List<Channel> getChannelsByServerId(Long serverId) {
+    public Optional<List<ChannelResponseDto>> getChannelsByServerId(Long serverId) {
         if (!messageServerRepository.existsById(serverId)) {
-            return null;
+            return Optional.empty();
         }
-        return channelRepository.findByServerIdOrderByNameAsc(serverId);
+        return Optional.of(channelRepository.findByServerIdOrderByNameAsc(serverId).stream()
+                .map(ChannelResponseDto::fromEntity)
+                .toList());
     }
 
-    public Channel getChannelById(Long channelId) {
-        return channelRepository.findById(channelId).orElse(null);
+    public Optional<ChannelResponseDto> getChannelById(Long channelId) {
+        return channelRepository.findById(channelId).map(ChannelResponseDto::fromEntity);
     }
 
     @Transactional
-    public Channel createChannel(Long serverId, CreateChannelRequestDto request, String creatorUsername) {
+    public ChannelResponseDto createChannel(Long serverId, CreateChannelRequestDto request, String creatorUsername) {
         if (!serverService.isUserAdmin(serverId, creatorUsername)) {
             throw new SecurityException("Only server administrators can create channels.");
         }
 
         if (channelRepository.existsByServerIdAndName(serverId, request.getName())) {
-            throw new IllegalStateException("Channel with name '" + request.getName() + "' already exists on this server.");
+            throw new IllegalStateException(
+                    "Channel with name '" + request.getName() + "' already exists on this server."
+            );
         }
 
         AppUser creator = appUserRepository.findByUsername(creatorUsername)
@@ -64,14 +71,14 @@ public class ChannelService {
 
         keyRotationService.solicitateNewKeyRotation(savedChannel.getId(), Set.of(creatorUsername));
 
-        return savedChannel;
+        return ChannelResponseDto.fromEntity(savedChannel);
     }
 
     @Transactional
-    public Channel updateChannel(Long channelId, UpdateChannelRequestDto request, String adminUsername) {
-        Channel channel = getChannelById(channelId);
+    public Optional<ChannelResponseDto> updateChannel(Long channelId, UpdateChannelRequestDto request, String adminUsername) {
+        Channel channel = channelRepository.findById(channelId).orElse(null);
         if (channel == null) {
-            return null;
+            return Optional.empty();
         }
 
         if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
@@ -79,18 +86,21 @@ public class ChannelService {
         }
 
         channel.setName(request.getName());
-        return channelRepository.save(channel);
+        return Optional.of(ChannelResponseDto.fromEntity(channelRepository.save(channel)));
     }
 
     @Transactional
     public void deleteChannel(Long channelId, String adminUsername) {
-        Channel channel = getChannelById(channelId);
-        if (channel != null) {
-            if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
-                throw new SecurityException("Only server administrators can delete channels.");
-            }
-            channelRepository.delete(channel);
+        Channel channel = channelRepository.findById(channelId).orElse(null);
+        if (channel == null) {
+            return;
         }
+
+        if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
+            throw new SecurityException("Only server administrators can delete channels.");
+        }
+
+        channelDeletionService.deleteChannel(channel);
     }
 
     public List<UserKeyResponseDto> getActivePublicKeysForChannel(Long channelId, String username) {
@@ -106,7 +116,7 @@ public class ChannelService {
                 .toList();
     }
 
-    public List<Channel> getMyChannelsForServer(Long serverId, String username) {
+    public List<ChannelResponseDto> getMyChannelsForServer(Long serverId, String username) {
         AppUser user = appUserRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -114,6 +124,8 @@ public class ChannelService {
             throw new SecurityException("You are not a member of this server.");
         }
 
-        return channelRepository.findAccessibleChannelsByServerIdAndUserId(serverId, user.getId());
+        return channelRepository.findAccessibleChannelsByServerIdAndUserId(serverId, user.getId()).stream()
+                .map(ChannelResponseDto::fromEntity)
+                .toList();
     }
 }

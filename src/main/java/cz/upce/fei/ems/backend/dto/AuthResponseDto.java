@@ -26,4 +26,12 @@ public class AuthResponseDto {
             example = "1717161600000"
     )
     private Long expiresAt;
+
+    public static AuthResponseDto fromToken(String token, String username, Long expiresAt) {
+        return AuthResponseDto.builder()
+                .token(token)
+                .username(username)
+                .expiresAt(expiresAt)
+                .build();
+    }
 }

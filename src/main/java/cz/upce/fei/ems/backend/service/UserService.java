@@ -50,21 +50,11 @@ public class UserService {
         return userKeyRepository.findByUserIdAndRevokedAtIsNull(userId);
     }
 
-    public UserResponseDto mapToUserResponse(AppUser user) {
-        return UserResponseDto.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .displayName(user.getDisplayName())
-                .createdAt(user.getCreatedAt())
-                .isBanned(user.isBanned())
-                .isMainAdmin(user.isMainAdmin())
-                .build();
+    public Optional<UserResponseDto> getUserResponse(AppUser user) {
+        return Optional.ofNullable(user).map(UserResponseDto::fromEntity);
     }
 
-    public UserKeyResponseDto mapToKeyResponse(UserKey userKey) {
-        return UserKeyResponseDto.builder()
-                .id(userKey.getId())
-                .publicKey(userKey.getPublicKey())
-                .build();
+    public Optional<UserKeyResponseDto> getActivePublicKeyResponse(Long userId) {
+        return getActivePublicKeyForUser(userId).map(UserKeyResponseDto::fromEntity);
     }
 }

@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -50,11 +52,7 @@ public class AuthService {
 
         String token = jwtService.generateToken(user.getUsername());
 
-        return AuthResponseDto.builder()
-                .token(token)
-                .username(user.getUsername())
-                .expiresAt(jwtService.getExpirationTimestamp(token))
-                .build();
+        return AuthResponseDto.fromToken(token, user.getUsername(), jwtService.getExpirationTimestamp(token));
     }
 
     public AuthResponseDto authenticate(LoginRequestDto request) {
@@ -76,11 +74,7 @@ public class AuthService {
 
         String token = jwtService.generateToken(user.getUsername());
 
-        return AuthResponseDto.builder()
-                .token(token)
-                .username(user.getUsername())
-                .expiresAt(jwtService.getExpirationTimestamp(token))
-                .build();
+        return AuthResponseDto.fromToken(token, user.getUsername(), jwtService.getExpirationTimestamp(token));
     }
 
     public String getPublicKey(Long id) {
@@ -97,41 +91,16 @@ public class AuthService {
                 .getPublicKey();
     }
 
+    public Map<String, String> getPublicKeyResponse(Long id) {
+        return Map.of("publicKey", getPublicKey(id));
+    }
+
     public AuthResponseDto refreshToken(RefreshTokenRequestDto request) {
         String token = request.getRefreshToken();
-
-        String username = jwtService.extractUsername(token);
-        if (username == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED, "Invalid token format"
-            );
-        }
-
-        AppUser user;
-        try {
-            user = userRepository.findByUsername(username)
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.UNAUTHORIZED, "User does not exist"
-                    ));
-        } catch (Exception e) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED, "User does not exist", e
-            );
-        }
-
-        if (user.isBanned()) {
-            throw new SecurityException("Access denied: Your account has been banned.");
-        }
-
-        UserDetails userDetails;
-        try {
-            userDetails = userDetailsService.loadUserByUsername(username);
-        } catch (Exception e) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED, "User not found", e
-            );
-        }
-
+        String username = extractRefreshUsername(token);
+        AppUser user = findRefreshUser(username);
+        rejectBannedUser(user);
+        UserDetails userDetails = loadRefreshUserDetails(username);
         if (!jwtService.isTokenValid(token, userDetails)) {
             throw new ResponseStatusException(
                     HttpStatus.UNAUTHORIZED, "Expired or invalid refresh token"
@@ -140,10 +109,47 @@ public class AuthService {
 
         String newToken = jwtService.generateToken(userDetails.getUsername());
 
-        return AuthResponseDto.builder()
-                .token(newToken)
-                .username(userDetails.getUsername())
-                .expiresAt(jwtService.getExpirationTimestamp(newToken))
-                .build();
+        return AuthResponseDto.fromToken(
+                newToken,
+                userDetails.getUsername(),
+                jwtService.getExpirationTimestamp(newToken)
+        );
+    }
+
+    private String extractRefreshUsername(String token) {
+        String username = jwtService.extractUsername(token);
+        if (username == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token format");
+        }
+        return username;
+    }
+
+    private AppUser findRefreshUser(String username) {
+        try {
+            return userRepository.findByUsername(username)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.UNAUTHORIZED, "User does not exist"
+                    ));
+        } catch (Exception e) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "User does not exist", e
+            );
+        }
+    }
+
+    private void rejectBannedUser(AppUser user) {
+        if (user.isBanned()) {
+            throw new SecurityException("Access denied: Your account has been banned.");
+        }
+    }
+
+    private UserDetails loadRefreshUserDetails(String username) {
+        try {
+            return userDetailsService.loadUserByUsername(username);
+        } catch (Exception e) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "User not found", e
+            );
+        }
     }
 }

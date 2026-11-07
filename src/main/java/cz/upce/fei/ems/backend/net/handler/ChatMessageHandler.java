@@ -22,19 +22,22 @@ public class ChatMessageHandler implements PacketHandler {
 
     @Override
     public void handle(WebSocketSession session, Packet packet) throws Exception {
-        String senderUsername = (String) session.getAttributes().get("username");
-        if (senderUsername == null) {
+        if (!(session.getAttributes().get("username") instanceof String senderUsername)) {
             dispatcher.sendError(session, "Unauthorized connection.");
             return;
         }
 
-        Long channelId = (Long) session.getAttributes().get("currentChannelId");
-        if (channelId == null) {
+        if (!(session.getAttributes().get("currentChannelId") instanceof Long channelId)) {
             dispatcher.sendError(session, "User is not in an active channel.");
             return;
         }
 
-        Long channelKeyId = (Long) session.getAttributes().get("currentChannelKeyId");
+        Object channelKeyIdAttribute = session.getAttributes().get("currentChannelKeyId");
+        if (channelKeyIdAttribute != null && !(channelKeyIdAttribute instanceof Long)) {
+            dispatcher.sendError(session, "Invalid channel key.");
+            return;
+        }
+        Long channelKeyId = channelKeyIdAttribute instanceof Long keyId ? keyId : null;
         byte[] payload = packet.getPayload();
 
         try {
