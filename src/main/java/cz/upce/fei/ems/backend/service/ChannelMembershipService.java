@@ -33,33 +33,45 @@ public class ChannelMembershipService {
 
     @Transactional
     public void addMemberToChannel(Long channelId, Long targetUserId, String adminUsername) {
+        Channel channel = findAuthorizedChannel(channelId, adminUsername);
+        validateTargetMembership(channelId, targetUserId);
+        ensureServerMembership(channel, targetUserId);
+        saveChannelMembership(channelId, targetUserId);
+    }
+
+    private Channel findAuthorizedChannel(Long channelId, String adminUsername) {
         Channel channel = channelRepository.findById(channelId)
                 .orElseThrow(() -> new IllegalArgumentException("Channel not found"));
-
         if (!serverService.isUserAdmin(channel.getServerId(), adminUsername)) {
             throw new SecurityException("Only server administrators can manage channel memberships.");
         }
+        return channel;
+    }
 
+    private void validateTargetMembership(Long channelId, Long targetUserId) {
         if (!appUserRepository.existsById(targetUserId)) {
             throw new IllegalArgumentException("Target user with ID " + targetUserId + " not found");
         }
-
         if (channelMemberRepository.existsByChannelIdAndUserId(channelId, targetUserId)) {
             throw new IllegalStateException("User is already a member of this channel.");
         }
+    }
 
-        if (!serverMemberRepository.existsByServerIdAndUserId(channel.getServerId(), targetUserId)) {
-            MessageServerMember serverMember = new MessageServerMember();
-            serverMember.setServerId(channel.getServerId());
-            serverMember.setUserId(targetUserId);
-            serverMember.setRole(MessageServerRole.MEMBER);
-            serverMemberRepository.save(serverMember);
+    private void ensureServerMembership(Channel channel, Long targetUserId) {
+        if (serverMemberRepository.existsByServerIdAndUserId(channel.getServerId(), targetUserId)) {
+            return;
         }
+        MessageServerMember serverMember = new MessageServerMember();
+        serverMember.setServerId(channel.getServerId());
+        serverMember.setUserId(targetUserId);
+        serverMember.setRole(MessageServerRole.MEMBER);
+        serverMemberRepository.save(serverMember);
+    }
 
+    private void saveChannelMembership(Long channelId, Long targetUserId) {
         ChannelMember member = new ChannelMember();
         member.setChannelId(channelId);
         member.setUserId(targetUserId);
-
         channelMemberRepository.save(member);
         channelMemberRepository.flush();
     }

@@ -1,12 +1,15 @@
 package cz.upce.fei.ems.backend.net.session;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Component
 public class SessionRegistry {
 
@@ -21,6 +24,7 @@ public class SessionRegistry {
         session.getAttributes().put("username", username);
     }
 
+    @SuppressWarnings("resource") // The WebSocket handler owns the session lifecycle.
     public void unregisterSession(WebSocketSession session) {
         if (session.getAttributes().get("username") instanceof String username) {
             activeSessions.remove(username);
@@ -64,11 +68,12 @@ public class SessionRegistry {
     public void removeAndCloseSession(String username) {
         WebSocketSession session = activeSessions.remove(username);
         if (session != null) {
-            try {
-                if (session.isOpen()) {
-                    session.close();
+            if (session.isOpen()) {
+                try (session) {
+                    log.debug("Closed WebSocket session for user {}", username);
+                } catch (IOException e) {
+                    log.warn("Failed to close WebSocket session for user {}: {}", username, e.getMessage(), e);
                 }
-            } catch (Exception e) {
             }
         }
         channelMembers.values().forEach(members -> members.remove(username));

@@ -40,43 +40,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
-        final String authHeader = request.getHeader("Authorization");
-        final String jwt;
-        final String username;
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
+        String jwt = extractBearerToken(request, response);
+        if (jwt == null) {
+            if (request.getHeader("Authorization") == null
+                    || !request.getHeader("Authorization").startsWith("Bearer ")) {
+                filterChain.doFilter(request, response);
+            }
             return;
         }
-        if (authHeader.length() < 8) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Token is too short.");
-            return;
-        }
-
-        jwt = authHeader.substring(7); // protože "Bearer "
 
         try {
-            username = jwtService.extractUsername(jwt);
-
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
-                AppUser appUser = appUserRepository.findByUsername(username).orElse(null);
-                if (appUser != null && appUser.isBanned()) {
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Your account has been globally banned.");
-                    return;
-                }
-
-                UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
-
-                if (jwtService.isTokenValid(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
+            if (!authenticateToken(jwt, request, response)) {
+                return;
             }
         } catch (Exception e) {
             log.warn("JWT authentication failed: {}", e.getMessage());
@@ -85,5 +60,48 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String extractBearerToken(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return null;
+        }
+        if (authHeader.length() < 8) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Token is too short.");
+            return null;
+        }
+        return authHeader.substring(7);
+    }
+
+    private boolean authenticateToken(
+            String jwt, HttpServletRequest request, HttpServletResponse response
+    ) throws Exception {
+        String username = jwtService.extractUsername(jwt);
+        if (username == null || SecurityContextHolder.getContext().getAuthentication() != null) {
+            return true;
+        }
+
+        AppUser appUser = appUserRepository.findByUsername(username).orElse(null);
+        if (appUser != null && appUser.isBanned()) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Your account has been globally banned.");
+            return false;
+        }
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        if (jwtService.isTokenValid(jwt, userDetails)) {
+            setAuthentication(userDetails, request);
+        }
+        return true;
+    }
+
+    private void setAuthentication(UserDetails userDetails, HttpServletRequest request) {
+        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities()
+        );
+        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authToken);
     }
 }
