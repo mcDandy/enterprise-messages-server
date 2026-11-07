@@ -1,7 +1,7 @@
 services:
   db:
     container_name: ${DB_CONTAINER_NAME:-db}
-    image: postgres:17
+    image: ghcr.io/pgmq/pg17-pgmq:v1.10.0
     environment:
       POSTGRES_DB: nnpro
       POSTGRES_USER: nnpro
@@ -90,16 +90,14 @@ services:
         condition: service_healthy
 
   db-test:
-    image: postgres:17
+    image: ghcr.io/pgmq/pg17-pgmq:v1.10.0
     profiles: ["test"]
     environment:
       POSTGRES_DB: nnpro_test
       POSTGRES_USER: nnpro
       POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:-nnpro_local_test}
-    # Never uses the application's postgres_data volume.
-    tmpfs:
-      - /var/lib/postgresql/data
     volumes:
+      - pgmq_test_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nnpro -d nnpro_test"]
@@ -127,3 +125,4 @@ services:
 
 volumes:
   postgres_data:
+  pgmq_test_data:

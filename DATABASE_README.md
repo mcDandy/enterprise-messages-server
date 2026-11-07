@@ -1,6 +1,6 @@
 # Database
 
-PostgreSQL 17 runs as Compose service `db` on the internal Docker network.
+PostgreSQL 17 with PGMQ runs as Compose service `db` on the internal Docker network.
 Data is stored in the `postgres_data` volume; no database port is exposed to
 the host. `database/schema.sql` initializes only new databases. Hibernate uses
 `ddl-auto=validate`, so existing schemas require SQL migrations.
@@ -26,11 +26,12 @@ missing migrations in order:
 - **002** – renames channel tables and converts message receipts; archives the
   old per-message receipts as `message_receipt_legacy`.
 - **003** – removes `fcm_token` and `key_hash`, switches key versions to UUID.
-- **004** – creates persistent E2EE pending key delivery and rotation queues.
+- **004** – creates legacy pending E2EE tables.
+- **005** – moves to PGMQ queues (requires legacy pending tables to be empty).
 
 The runner skips migrations reflected in the schema, including for a newly
 initialized database. It stops on unexpected/partially upgraded schemas rather
-than applying potentially destructive DDL. Do not run migrations 002–004 by hand
+than applying potentially destructive DDL. Do not run migrations 002–005 by hand
 more than once.
 
 **Compatibility warning:** 003 assigns new UUID versions to historical channel

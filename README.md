@@ -1,6 +1,6 @@
 # Enterprise Messages – backend
 
-Spring Boot (Java 21), PostgreSQL 17, Docker Compose, HTTPS/WSS.
+Spring Boot (Java 21), PostgreSQL 17 + PGMQ, Docker Compose, HTTPS/WSS.
 
 ## Start
 
@@ -50,8 +50,12 @@ require the dev override.
 docker compose -p nnpro-tests --profile test run --rm --build tests
 ```
 
-Tests use a separate database. Remove the test containers afterwards with
-`docker compose -p nnpro-tests --profile test down`.
+Tests use a separate PGMQ-enabled database (`nnpro_test`). The Gradle suite also
+runs `PostgresKeyQueueIntegrationTest` against the real database (enqueue, claim,
+recipient/channel filtering, visibility timeout and acknowledgment). It rejects
+other database names to avoid writing test packets into application data.
+Remove the test containers **and the isolated test volume** afterwards with
+`docker compose -p nnpro-tests --profile test down --volumes`.
 
 ## Existing database upgrade
 
@@ -61,21 +65,20 @@ PostgreSQL volumes need migrations when backend/database versions change.
 
 ```sh
 docker compose stop backend
+docker compose up -d db
 docker compose --profile migrate run --rm migrate
-docker compose up -d --build
+docker compose up -d --build backend
 ```
 
 The migration runner recognizes the legacy table layout and applies any
-required migrations **001 → 002 → 003 → 004** in order. It skips migrations
+required migrations **001 → 002 → 003 → 004 → 005** in order. It skips migrations
 already reflected in the schema, including on a fresh database. Unknown or
 partially upgraded schema states cause an error rather than destructive guesses.
-
-**Important:** Migration 003 replaces numeric channel-key versions with new
-UUIDs. Clients remembering old numeric versions need a separate migration of
-their local mapping. For details, see [DATABASE_README.md](DATABASE_README.md).
-If you use `compose.dev.yaml --watch`, stop that session first and restart it
-with the dev command afterwards instead of starting the normal backend. Never
-use `docker compose down -v` unless you intend to delete the database volume.
+Migration 005 requires the PostgreSQL 17 PGMQ image to be running and refuses
+to delete pending tables that still contain unprocessed entries. Before the
+upgrade, check and resolve any old `channel_key_pending` or
+`channel_rotation_pending` rows; the old ciphertext-only
+rows cannot be reconstructed into complete WebSocket packets automatically.
 
 ## Configuration
 
@@ -107,3 +110,16 @@ Firebase push notifications are not available.
 
 The Compose commands are cross-platform. On Linux with SELinux (e.g. Fedora),
 bind-mount permissions may require additional configuration.
+
+## Persistent key queue (PGMQ)
+
+The database image is `ghcr.io/pgmq/pg17-pgmq:v1.10.0` (PostgreSQL 17).
+`schema.sql` initializes PGMQ on new databases; migration 005 does the
+same on existing databases and removes the old pending tables only when
+empty. The migrator also rejects a partially migrated state with both
+PGMQ queues and old pending tables still present.
+
+Two queues are used: `nnpro_key_delivery` stores complete encoded key packets
+for individual recipients, and `nnpro_key_rotation` stores rotation triggers.
+`PostgresKeyQueue` is the Java SQL adapter. Its filtered `pgmq.read` call is
+an experimental PGMQ API; keep the extension version pinned and test upgrades.

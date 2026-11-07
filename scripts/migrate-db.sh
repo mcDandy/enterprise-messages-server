@@ -98,9 +98,37 @@ case "$key_state" in
     ;;
 esac
 
-# Migration 004 adds two E2EE pending-rotation/delivery queue tables.
-# Both present = complete, neither present = pending, one present = inconsistent.
-queue_state=$(psql_query "
+# New schema uses PGMQ queues. In existing installations migration 005
+# creates PGMQ and removes empty pending tables.
+pgmq_state=$(psql_query "
+SELECT CASE
+  WHEN to_regclass('pgmq.q_nnpro_key_delivery') IS NOT NULL
+       AND to_regclass('pgmq.q_nnpro_key_rotation') IS NOT NULL
+       AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgmq') THEN 'done'
+  WHEN to_regclass('pgmq.q_nnpro_key_delivery') IS NULL
+       AND to_regclass('pgmq.q_nnpro_key_rotation') IS NULL THEN 'pending'
+  ELSE 'partial'
+END;")
+
+case "$pgmq_state" in
+  done)
+    # Never silently treat PGMQ as fully migrated while old pending tables
+    # still exist. They may contain undelivered key material; inspect first.
+    remaining_tables=$(psql_query "
+SELECT concat_ws(', ',
+  CASE WHEN to_regclass('public.channel_key_pending') IS NOT NULL
+       THEN 'public.channel_key_pending' END,
+  CASE WHEN to_regclass('public.channel_rotation_pending') IS NOT NULL
+       THEN 'public.channel_rotation_pending' END);")
+    if [ -n "$remaining_tables" ]; then
+      echo "ERROR: PGMQ queues exist, but legacy pending tables remain: $remaining_tables" >&2
+      echo 'Inspect and resolve their data before manually completing migration 005.' >&2
+      exit 1
+    fi
+    echo 'Migrations 004-005: PGMQ key queues already available.'
+    ;;
+  pending)
+    legacy_queue_state=$(psql_query "
 SELECT CASE
   WHEN to_regclass('public.channel_key_pending') IS NOT NULL
        AND to_regclass('public.channel_rotation_pending') IS NOT NULL THEN 'done'
@@ -108,22 +136,17 @@ SELECT CASE
        AND to_regclass('public.channel_rotation_pending') IS NULL THEN 'pending'
   ELSE 'partial'
 END;")
-
-case "$queue_state" in
-  pending)
-    apply_migration 004_pending_key_rotation_queues.sql
-    ;;
-  done)
-    echo 'Migration 004: already applied (or fresh schema).'
-    ;;
-  partial)
-    echo 'ERROR: Only one pending-key queue table exists. Inspect the schema manually.' >&2
-    exit 1
+    case "$legacy_queue_state" in
+      pending) apply_migration 004_pending_key_rotation_queues.sql ;;
+      done) echo 'Migration 004: already applied.' ;;
+      *) echo 'ERROR: legacy pending tables have an inconsistent schema.' >&2; exit 1 ;;
+    esac
+    apply_migration 005_pgmq_key_queues.sql
     ;;
   *)
-    echo "ERROR: Unexpected queue schema state: $queue_state" >&2
+    echo 'ERROR: PGMQ key queues are partially initialized; inspect before migrating.' >&2
     exit 1
     ;;
 esac
 
-echo 'Database migrations 001-004: up to date.'
+echo 'Database migrations 001-005: up to date.'
