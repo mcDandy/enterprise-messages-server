@@ -66,11 +66,27 @@ class AppUserUnitTest {
         assertThat(authorities)
                 .hasSize(1)
                 .extracting(GrantedAuthority::getAuthority)
-                .containsExactly("user");
+                .containsExactly("ROLE_USER");
 
         assertThat(user.isAccountNonExpired()).isTrue();
         assertThat(user.isAccountNonLocked()).isTrue();
         assertThat(user.isCredentialsNonExpired()).isTrue();
         assertThat(user.isEnabled()).isTrue();
+    }
+
+    @Test
+    void testAdminAuthorities() {
+        // Arrange
+        AppUser user = new AppUser();
+        user.setMainAdmin(true);
+
+        // Act
+        Collection<? extends GrantedAuthority> authorities = user.getAuthorities();
+
+        // Assert
+        assertThat(authorities)
+                .hasSize(2)
+                .extracting(GrantedAuthority::getAuthority)
+                .containsExactlyInAnyOrder("ROLE_USER", "ROLE_ADMIN");
     }
 }

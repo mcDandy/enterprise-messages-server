@@ -1,7 +1,7 @@
 package cz.upce.fei.ems.backend.controller;
 
+import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.dto.*;
-import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -11,9 +11,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/users")
@@ -22,7 +21,6 @@ import java.security.Principal;
 public class UserController {
 
     private final UserService userService;
-    private final AppUserRepository appUserRepository;
 
     @Operation(
             summary = "Get current user profile",
@@ -33,10 +31,11 @@ public class UserController {
             }
     )
     @GetMapping("/me")
-    public ResponseEntity<UserResponseDto> getCurrentUser(Principal principal) {
-        return appUserRepository.findByUsername(principal.getName())
-                .map(user -> ResponseEntity.ok(userService.mapToUserResponse(user)))
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<UserResponseDto> getCurrentUser(@AuthenticationPrincipal AppUser user) {
+        if (user == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(userService.mapToUserResponse(user));
     }
 
     @Operation(
@@ -48,8 +47,8 @@ public class UserController {
     )
     @PutMapping("/me/display-name")
     public ResponseEntity<Void> updateDisplayName(
-            @Valid @RequestBody UpdateDisplayNameRequestDto request, Principal principal) {
-        userService.updateDisplayName(principal.getName(), request.getDisplayName());
+            @Valid @RequestBody UpdateDisplayNameRequestDto request, @AuthenticationPrincipal AppUser user) {
+        userService.updateDisplayName(user.getUsername(), request.getDisplayName());
         return ResponseEntity.ok().build();
     }
 
@@ -62,9 +61,9 @@ public class UserController {
     )
     @PostMapping("/me/keys")
     public ResponseEntity<Void> rotatePublicKey(
-            @Valid @RequestBody RotatePublicKeyRequestDto request, Principal principal
+            @Valid @RequestBody RotatePublicKeyRequestDto request, @AuthenticationPrincipal AppUser user
     ) {
-        userService.rotatePublicKey(principal.getName(), request.getPublicKey());
+        userService.rotatePublicKey(user.getUsername(), request.getPublicKey());
         return ResponseEntity.ok().build();
     }
 
