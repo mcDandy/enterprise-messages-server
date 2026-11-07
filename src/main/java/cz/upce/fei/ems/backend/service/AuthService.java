@@ -52,11 +52,7 @@ public class AuthService {
 
         String token = jwtService.generateToken(user.getUsername());
 
-        return AuthResponseDto.builder()
-                .token(token)
-                .username(user.getUsername())
-                .expiresAt(jwtService.getExpirationTimestamp(token))
-                .build();
+        return AuthResponseDto.fromToken(token, user.getUsername(), jwtService.getExpirationTimestamp(token));
     }
 
     public AuthResponseDto authenticate(LoginRequestDto request) {
@@ -78,11 +74,7 @@ public class AuthService {
 
         String token = jwtService.generateToken(user.getUsername());
 
-        return AuthResponseDto.builder()
-                .token(token)
-                .username(user.getUsername())
-                .expiresAt(jwtService.getExpirationTimestamp(token))
-                .build();
+        return AuthResponseDto.fromToken(token, user.getUsername(), jwtService.getExpirationTimestamp(token));
     }
 
     public String getPublicKey(Long id) {
@@ -146,10 +138,10 @@ public class AuthService {
 
         String newToken = jwtService.generateToken(userDetails.getUsername());
 
-        return AuthResponseDto.builder()
-                .token(newToken)
-                .username(userDetails.getUsername())
-                .expiresAt(jwtService.getExpirationTimestamp(newToken))
-                .build();
+        return AuthResponseDto.fromToken(
+                newToken,
+                userDetails.getUsername(),
+                jwtService.getExpirationTimestamp(newToken)
+        );
     }
 }

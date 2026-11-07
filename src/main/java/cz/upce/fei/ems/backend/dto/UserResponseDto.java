@@ -1,5 +1,6 @@
 package cz.upce.fei.ems.backend.dto;
 
+import cz.upce.fei.ems.backend.domain.AppUser;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -32,4 +33,15 @@ public class UserResponseDto {
 
     @Schema(example = "false")
     private boolean isMainAdmin;
+
+    public static UserResponseDto fromEntity(AppUser user) {
+        return UserResponseDto.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .displayName(user.getDisplayName())
+                .createdAt(user.getCreatedAt())
+                .isBanned(user.isBanned())
+                .isMainAdmin(user.isMainAdmin())
+                .build();
+    }
 }

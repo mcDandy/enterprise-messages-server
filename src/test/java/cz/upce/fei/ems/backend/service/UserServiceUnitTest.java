@@ -15,7 +15,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -71,8 +70,8 @@ class UserServiceUnitTest {
     }
 
     @Test
-    void testMapToUserResponse() {
-        UserResponseDto dto = userService.mapToUserResponse(user);
+    void testUserResponseFromEntity() {
+        UserResponseDto dto = UserResponseDto.fromEntity(user);
         assertEquals(user.getId(), dto.getId());
         assertEquals(user.getUsername(), dto.getUsername());
         assertEquals(user.getDisplayName(), dto.getDisplayName());

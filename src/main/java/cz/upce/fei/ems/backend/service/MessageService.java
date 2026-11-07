@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -34,12 +35,11 @@ public class MessageService {
     }
 
     private MessageResponseDto toResponse(Message message) {
-        MessageResponseDto response = MessageResponseDto.fromEntity(message);
-        response.setKeyVersion(channelKeyRepository.findById(message.getChannelKeyId())
+        UUID keyVersion = channelKeyRepository.findById(message.getChannelKeyId())
                 .orElseThrow(() -> new IllegalStateException(
                         "Missing key version for message " + message.getId()))
-                .getVersion());
-        return response;
+                .getVersion();
+        return MessageResponseDto.fromEntity(message, keyVersion);
     }
 
     @Transactional

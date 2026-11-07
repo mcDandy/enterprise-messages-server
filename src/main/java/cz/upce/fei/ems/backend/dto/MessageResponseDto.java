@@ -36,6 +36,10 @@ public class MessageResponseDto {
 
 
     public static MessageResponseDto fromEntity(Message message) {
+        return fromEntity(message, null);
+    }
+
+    public static MessageResponseDto fromEntity(Message message, UUID keyVersion) {
         return MessageResponseDto.builder()
                 .id(message.getId())
                 .channelId(message.getChannelId())
@@ -43,6 +47,7 @@ public class MessageResponseDto {
                 .ciphertext(message.getCiphertext())
                 .sentAt(message.getSentAt())
                 .channelKeyId(message.getChannelKeyId())
+                .keyVersion(keyVersion)
                 .build();
     }
 }
