@@ -9,6 +9,7 @@ public enum PacketType {
 
     UNKNOWN((byte) 0x00),
     CHAT_MESSAGE_ENC((byte) 0x01),
+    CHANNEL_JOIN((byte) 0x04),
     ROTATE_KEY((byte) 0x0a),
     UNICAST_KEY_ROTATION((byte) 0x0d);
 
