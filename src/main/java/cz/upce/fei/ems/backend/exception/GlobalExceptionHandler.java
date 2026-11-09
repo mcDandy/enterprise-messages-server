@@ -1,6 +1,5 @@
 package cz.upce.fei.ems.backend.exception;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -16,7 +15,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.HashMap;
 import java.util.Map;
 
-@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -73,10 +71,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<String> handleRuntime(RuntimeException ex) {
-        // The advice handles the exception inside DispatcherServlet, so Tomcat never reports it and
-        // the container logs stay empty for a failing request. Log here or the cause is invisible.
-        log.error("Unhandled runtime exception during request processing", ex);
+    public ResponseEntity<String> handleRuntime() {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("Internal server error.");
     }
