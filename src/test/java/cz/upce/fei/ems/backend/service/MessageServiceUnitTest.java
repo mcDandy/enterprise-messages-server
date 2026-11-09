@@ -53,6 +53,18 @@ class MessageServiceUnitTest {
     }
 
     @Test
+    void testProcessAndSaveMessageRejectsMissingChannelKey() {
+        when(appUserRepository.findByUsername("sender")).thenReturn(Optional.of(sender));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
+                messageService.processAndSaveMessage("sender", 10L, null, "encrypted".getBytes()));
+
+        assertTrue(exception.getMessage().contains("no active encryption key"),
+                "error should tell the client to wait for key rotation");
+        verify(messageRepository, never()).save(any(Message.class));
+    }
+
+    @Test
     void testProcessAndSaveMessageUserNotFound() {
         when(appUserRepository.findByUsername("unknown")).thenReturn(Optional.empty());
         assertThrows(IllegalArgumentException.class, () ->

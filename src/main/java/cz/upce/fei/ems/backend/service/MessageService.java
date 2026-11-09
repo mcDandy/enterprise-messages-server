@@ -47,6 +47,12 @@ public class MessageService {
         AppUser sender = appUserRepository.findByUsername(senderUsername)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + senderUsername));
 
+        if (channelKeyId == null) {
+            throw new IllegalStateException(
+                    "Channel " + channelId + " has no active encryption key yet. Wait for key rotation to complete."
+            );
+        }
+
         Message message = new Message();
         message.setChannelId(channelId);
         message.setChannelKeyId(channelKeyId);
