@@ -28,6 +28,8 @@ missing migrations in order:
 - **003** – removes `fcm_token` and `key_hash`, switches key versions to UUID.
 - **004** – creates legacy pending E2EE tables.
 - **005** – moves to PGMQ queues (requires legacy pending tables to be empty).
+- **006** – creates one queue per user, queued rotation triggers and old
+archives must be empty.
 
 The runner skips migrations reflected in the schema, including for a newly
 initialized database. It stops on unexpected/partially upgraded schemas rather

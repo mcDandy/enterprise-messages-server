@@ -3,9 +3,10 @@ package cz.upce.fei.ems.backend.service;
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.ChannelKey;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
+import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.session.SessionRegistry;
-import cz.upce.fei.ems.backend.queue.PostgresKeyQueue;
+import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
@@ -40,7 +41,9 @@ class KeyRotationServiceUnitTest {
     @Mock
     private AppUserRepository appUserRepository;
     @Mock
-    private PostgresKeyQueue keyQueue;
+    private PostgresUserQueue userQueue;
+    @org.mockito.Spy
+    private PacketCodec packetCodec = new PacketCodec();
     @Mock
     private QueuedKeyDeliveryService keyDeliveryService;
     @Mock
@@ -59,19 +62,23 @@ class KeyRotationServiceUnitTest {
         when(channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(10L))
                 .thenReturn(Optional.empty());
 
+        when(appUserRepository.findByUsername("user1")).thenReturn(Optional.of(user(1L, "user1")));
         keyRotationService.solicitateNewKeyRotation(10L, Set.of("user1"));
 
         verify(channelKeyRepository).save(any(ChannelKey.class));
-        verify(dispatcher).sendTo(eq(session), any(Packet.class));
-        verify(keyQueue, never()).enqueueRotation(anyLong());
+        verify(userQueue).enqueueForUser(eq(1L), eq(10L), any(byte[].class));
+        verify(keyDeliveryService).deliverQueuedKeys(1L, "user1", session);
+        verify(dispatcher, never()).sendTo(any(), any());
     }
 
     @Test
     void testSolicitateNewKeyRotationOffline() throws Exception {
+        when(appUserRepository.findByUsername("user1")).thenReturn(Optional.of(user(1L, "user1")));
         keyRotationService.solicitateNewKeyRotation(10L, Set.of("user1"));
 
-        verify(keyQueue).enqueueRotation(10L);
-        verify(channelKeyRepository, never()).save(any(ChannelKey.class));
+        verify(channelKeyRepository).save(any(ChannelKey.class));
+        verify(userQueue).enqueueForUser(eq(1L), eq(10L), any(byte[].class));
+        verifyNoInteractions(keyDeliveryService);
         verify(dispatcher, never()).sendTo(any(), any());
     }
 
@@ -84,8 +91,8 @@ class KeyRotationServiceUnitTest {
         keyRotationService.handleClientUnicastRotation(
                 10L, 1L, "user1", 2L, "cipher".getBytes(StandardCharsets.UTF_8));
 
-        InOrder inOrder = inOrder(keyQueue, keyDeliveryService);
-        inOrder.verify(keyQueue).enqueueForUser(eq(2L), eq(10L), any(Packet.class));
+        InOrder inOrder = inOrder(userQueue, keyDeliveryService);
+        inOrder.verify(userQueue).enqueueForUser(eq(2L), eq(10L), any(byte[].class));
         inOrder.verify(keyDeliveryService).deliverQueuedKeys(2L, "user2", session);
         verify(dispatcher, never()).sendTo(any(), any());
     }
@@ -97,9 +104,16 @@ class KeyRotationServiceUnitTest {
         keyRotationService.handleClientUnicastRotation(
                 10L, 1L, "user1", 2L, "cipher".getBytes(StandardCharsets.UTF_8));
 
-        verify(keyQueue).enqueueForUser(eq(2L), eq(10L), any(Packet.class));
+        verify(userQueue).enqueueForUser(eq(2L), eq(10L), any(byte[].class));
         verifyNoInteractions(keyDeliveryService);
         verify(dispatcher, never()).sendTo(any(), any());
+    }
+
+    private static AppUser user(long id, String username) {
+        AppUser user = new AppUser();
+        user.setId(id);
+        user.setUsername(username);
+        return user;
     }
 
     private void stubValidUnicastRotation() {

@@ -237,10 +237,18 @@ CREATE UNIQUE INDEX "UQ_user_key_active"
     ON user_key (user_id)
     WHERE revoked_at IS NULL;
 
--- PGMQ keeps offline key packets and rotation triggers in persistent queues.
--- The PGMQ extension is provided by the PostgreSQL 17 Docker image.
+-- Every user owns a durable PGMQ queue, independent of packet type.
 CREATE EXTENSION IF NOT EXISTS pgmq;
-SELECT pgmq.create('nnpro_key_delivery');
-SELECT pgmq.create('nnpro_key_rotation');
+
+CREATE FUNCTION public.ems_create_user_queue() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM pgmq.create('ems_user_' || NEW.id::text);
+    RETURN NEW;
+END $$;
+
+CREATE TRIGGER ems_user_queue_on_insert
+AFTER INSERT ON public.app_user
+FOR EACH ROW EXECUTE FUNCTION public.ems_create_user_queue();
 
 COMMIT;

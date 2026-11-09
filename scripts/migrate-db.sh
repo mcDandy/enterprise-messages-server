@@ -98,35 +98,21 @@ case "$key_state" in
     ;;
 esac
 
-# New schema uses PGMQ queues. In existing installations migration 005
-# creates PGMQ and removes empty pending tables.
+# Older installations pass through 004/005 before converting to per-user queues.
+# Fresh schemas already have PGMQ but no legacy shared queues.
 pgmq_state=$(psql_query "
 SELECT CASE
   WHEN to_regclass('pgmq.q_nnpro_key_delivery') IS NOT NULL
-       AND to_regclass('pgmq.q_nnpro_key_rotation') IS NOT NULL
-       AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgmq') THEN 'done'
+       AND to_regclass('pgmq.q_nnpro_key_rotation') IS NOT NULL THEN 'old_queues'
+  WHEN to_regclass('pgmq.q_nnpro_key_delivery') IS NULL
+       AND to_regclass('pgmq.q_nnpro_key_rotation') IS NULL
+       AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgmq') THEN 'user_queues'
   WHEN to_regclass('pgmq.q_nnpro_key_delivery') IS NULL
        AND to_regclass('pgmq.q_nnpro_key_rotation') IS NULL THEN 'pending'
   ELSE 'partial'
 END;")
 
 case "$pgmq_state" in
-  done)
-    # Never silently treat PGMQ as fully migrated while old pending tables
-    # still exist. They may contain undelivered key material; inspect first.
-    remaining_tables=$(psql_query "
-SELECT concat_ws(', ',
-  CASE WHEN to_regclass('public.channel_key_pending') IS NOT NULL
-       THEN 'public.channel_key_pending' END,
-  CASE WHEN to_regclass('public.channel_rotation_pending') IS NOT NULL
-       THEN 'public.channel_rotation_pending' END);")
-    if [ -n "$remaining_tables" ]; then
-      echo "ERROR: PGMQ queues exist, but legacy pending tables remain: $remaining_tables" >&2
-      echo 'Inspect and resolve their data before manually completing migration 005.' >&2
-      exit 1
-    fi
-    echo 'Migrations 004-005: PGMQ key queues already available.'
-    ;;
   pending)
     legacy_queue_state=$(psql_query "
 SELECT CASE
@@ -143,10 +129,26 @@ END;")
     esac
     apply_migration 005_pgmq_key_queues.sql
     ;;
+  old_queues|user_queues)
+    remaining_tables=$(psql_query "
+SELECT concat_ws(', ',
+  CASE WHEN to_regclass('public.channel_key_pending') IS NOT NULL
+       THEN 'public.channel_key_pending' END,
+  CASE WHEN to_regclass('public.channel_rotation_pending') IS NOT NULL
+       THEN 'public.channel_rotation_pending' END);")
+    if [ -n "$remaining_tables" ]; then
+      echo "ERROR: legacy pending tables remain: $remaining_tables" >&2
+      echo 'Inspect and resolve the pending data before migration 006.' >&2
+      exit 1
+    fi
+    ;;
   *)
-    echo 'ERROR: PGMQ key queues are partially initialized; inspect before migrating.' >&2
+    echo 'ERROR: PGMQ shared queues are partially initialized; inspect before migrating.' >&2
     exit 1
     ;;
 esac
 
-echo 'Database migrations 001-005: up to date.'
+# Migration 006 is idempotent and also backfills queues for pre-existing users.
+apply_migration 006_user_packet_queues.sql
+
+echo 'Database migrations 001-006: up to date.'
