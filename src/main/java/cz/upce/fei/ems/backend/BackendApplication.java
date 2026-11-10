@@ -11,4 +11,3 @@ public class BackendApplication {
     }
 
 }
-// todo, we also must run this in docker container :D

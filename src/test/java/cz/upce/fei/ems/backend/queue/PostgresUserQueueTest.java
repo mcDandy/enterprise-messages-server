@@ -50,4 +50,20 @@ class PostgresUserQueueTest {
         assertTrue(queue.acknowledgeForUser(8L, 7L));
         verify(jdbc).queryForObject(contains("pgmq.delete"), eq(Boolean.class), eq("ems_user_8"), eq(7L));
     }
+
+    @Test
+    void peeksAndAcknowledgesTheQueueHead() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        PostgresUserQueue queue = new PostgresUserQueue(jdbc);
+        when(jdbc.query(contains("ORDER BY msg_id LIMIT 1"), any(org.springframework.jdbc.core.RowMapper.class)))
+                .thenReturn(java.util.List.of(new QueuedPacket(12L, new byte[]{1, 2})));
+        when(jdbc.queryForObject(contains("ORDER BY msg_id LIMIT 1"), eq(Boolean.class), eq("ems_user_8")))
+                .thenReturn(true);
+
+        assertEquals(12L, queue.peekFirstForUser(8L).getFirst().messageId());
+        assertTrue(queue.acknowledgeFirstForUser(8L));
+        verify(jdbc).query(contains("FROM pgmq.\"q_ems_user_8\" ORDER BY msg_id LIMIT 1"),
+                any(org.springframework.jdbc.core.RowMapper.class));
+        verify(jdbc).queryForObject(contains("pgmq.delete(?, msg_id)"), eq(Boolean.class), eq("ems_user_8"));
+    }
 }

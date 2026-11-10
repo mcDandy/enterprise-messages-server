@@ -18,9 +18,8 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests transport invariants only. The backend does not implement client ACK
- * or post-enqueue channel authorization yet; tests must not endorse premature
- * deletion after a successful WebSocket write or silently skip security checks.
+ * Tests transport invariants only. Queue entries remain until a client ACK,
+ * and queued channel authorization is not implemented yet.
  */
 class QueuedKeyDeliveryServiceTest {
     private final PostgresUserQueue queue = mock(PostgresUserQueue.class);
@@ -32,23 +31,23 @@ class QueuedKeyDeliveryServiceTest {
 
     @Test
     void failedSendDoesNotDeleteQueuedPacket() throws Exception {
-        when(queue.claimForUser(5L, 60, 100))
+        when(queue.peekFirstForUser(5L))
                 .thenReturn(List.of(new QueuedPacket(11L, frame(PacketType.UNICAST_KEY_ROTATION.getCode(), new byte[]{8, 9, 10}))));
         when(session.isOpen()).thenReturn(true);
         doThrow(new IOException("socket disconnected")).when(dispatcher)
                 .sendTo(eq(session), any(Packet.class));
 
-        delivery.deliverQueuedKeys(5L, "bob", session);
+        delivery.sendNextQueuedPacket(5L, "bob", session);
         verify(queue, never()).acknowledgeForUser(anyLong(), anyLong());
     }
 
     @Test
     void closedSessionDoesNotForwardOrDeleteQueuedPacket() throws Exception {
-        when(queue.claimForUser(5L, 60, 100))
+        when(queue.peekFirstForUser(5L))
                 .thenReturn(List.of(new QueuedPacket(15L, frame(PacketType.UNICAST_KEY_ROTATION.getCode(), new byte[]{8, 9}))));
         when(session.isOpen()).thenReturn(false);
 
-        delivery.deliverQueuedKeys(5L, "bob", session);
+        delivery.sendNextQueuedPacket(5L, "bob", session);
         verifyNoInteractions(dispatcher);
         verify(queue, never()).acknowledgeForUser(anyLong(), anyLong());
     }
@@ -57,18 +56,46 @@ class QueuedKeyDeliveryServiceTest {
     void forwardsFullOpaqueFrameWithoutInterpretingItsType() throws Exception {
         byte[] payload = {7, 0, (byte) 0xff};
         byte[] raw = frame(PacketType.CHAT_MESSAGE_ENC.getCode(), payload);
-        when(queue.claimForUser(5L, 60, 100))
+        when(queue.peekFirstForUser(5L))
                 .thenReturn(List.of(new QueuedPacket(14L, raw)));
         when(session.isOpen()).thenReturn(true);
 
-        delivery.deliverQueuedKeys(5L, "bob", session);
+        delivery.sendNextQueuedPacket(5L, "bob", session);
 
         ArgumentCaptor<Packet> actual = ArgumentCaptor.forClass(Packet.class);
         verify(dispatcher).sendTo(eq(session), actual.capture());
         assertEquals(PacketType.CHAT_MESSAGE_ENC.getCode(), actual.getValue().getType());
         assertArrayEquals(payload, actual.getValue().getPayload());
-        // Do NOT assert that sendTo() triggers pgmq.delete(). Client ACK is not
-        // implemented, and an OS-level WebSocket write is not proof of receipt.
+        verify(queue, never()).acknowledgeForUser(anyLong(), anyLong());
+    }
+
+    @Test
+    void acknowledgmentRemovesQueueHeadAndSendsOneNextPacket() throws Exception {
+        byte[] firstFrame = frame(PacketType.CHAT_MESSAGE_ENC.getCode(), new byte[]{1});
+        byte[] secondFrame = frame(PacketType.UNICAST_KEY_ROTATION.getCode(), new byte[]{2});
+        when(queue.peekFirstForUser(5L))
+                .thenReturn(List.of(new QueuedPacket(21L, firstFrame)),
+                        List.of(new QueuedPacket(22L, secondFrame)));
+        when(queue.acknowledgeFirstForUser(5L)).thenReturn(true);
+        when(session.isOpen()).thenReturn(true);
+
+        delivery.sendNextQueuedPacket(5L, "bob", session);
+        delivery.acknowledgeAndSendNext(5L, "bob", session);
+
+        verify(queue).acknowledgeFirstForUser(5L);
+        verify(dispatcher, times(2)).sendTo(eq(session), any(Packet.class));
+        verify(queue, times(2)).peekFirstForUser(5L);
+    }
+
+    @Test
+    void acknowledgmentWithEmptyQueueDoesNotSendAnything() {
+        when(queue.acknowledgeFirstForUser(5L)).thenReturn(false);
+
+        delivery.acknowledgeAndSendNext(5L, "bob", session);
+
+        verify(queue).acknowledgeFirstForUser(5L);
+        verify(queue, never()).peekFirstForUser(anyLong());
+        verifyNoInteractions(dispatcher);
     }
 
     private byte[] frame(byte type, byte[] payload) {

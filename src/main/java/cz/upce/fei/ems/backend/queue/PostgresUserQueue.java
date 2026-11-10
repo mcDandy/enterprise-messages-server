@@ -49,6 +49,22 @@ public class PostgresUserQueue {
                 queueName(userId), visibilityTimeoutSeconds, limit);
     }
 
+    public List<QueuedPacket> peekFirstForUser(long userId) {
+        return jdbc.query(
+                "SELECT msg_id, decode(message->>'frame', 'base64') AS frame " +
+                        "FROM pgmq.\"q_" + queueName(userId) + "\" ORDER BY msg_id LIMIT 1",
+                (rs, index) -> new QueuedPacket(rs.getLong("msg_id"), rs.getBytes("frame")));
+    }
+
+    public boolean acknowledgeFirstForUser(long userId) {
+        String queue = queueName(userId);
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT COALESCE((SELECT pgmq.delete(?, msg_id) FROM (" +
+                        "SELECT msg_id FROM pgmq.\"q_" + queue + "\" ORDER BY msg_id LIMIT 1" +
+                        ") head), false)",
+                Boolean.class, queue));
+    }
+
     /** Message IDs are unique only inside a user's queue. */
     public boolean acknowledgeForUser(long userId, long messageId) {
         return Boolean.TRUE.equals(jdbc.queryForObject(
