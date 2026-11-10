@@ -6,24 +6,31 @@ import cz.upce.fei.ems.backend.domain.Message;
 import cz.upce.fei.ems.backend.dto.MessageResponseDto;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
+import cz.upce.fei.ems.backend.net.session.SessionRegistry;
 import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MessageService {
@@ -34,6 +41,8 @@ public class MessageService {
     private final ChannelMemberRepository channelMemberRepository;
     private final PostgresUserQueue userQueue;
     private final PacketCodec packetCodec;
+    private final SessionRegistry sessionRegistry;
+    private final QueuedKeyDeliveryService queuedPacketDeliveryService;
 
     public List<MessageResponseDto> getRecentMessages(Long channelId) {
         return messageRepository.findTop50ByChannelIdOrderBySentAtDescIdDesc(channelId).stream()
@@ -88,5 +97,37 @@ public class MessageService {
                 .filter(userId -> !sender.getId().equals(userId))
                 .collect(Collectors.toSet());
         recipientIds.forEach(userId -> userQueue.enqueueForUser(userId, frame));
+
+        List<AppUser> recipients = new ArrayList<>(appUserRepository.findAllById(recipientIds));
+        dispatchAfterCommit(recipients);
+    }
+
+    private void dispatchAfterCommit(List<AppUser> recipients) {
+        Runnable dispatch = () -> {
+            for (AppUser recipient : recipients) {
+                WebSocketSession session = sessionRegistry.getSession(recipient.getUsername());
+                if (session == null || !session.isOpen()) {
+                    continue;
+                }
+                try {
+                    queuedPacketDeliveryService.sendNextQueuedPacket(
+                            recipient.getId(), recipient.getUsername(), session);
+                } catch (Exception e) {
+                    log.warn("Could not dispatch queued packet to user {}; retained for retry",
+                            recipient.getId(), e);
+                }
+            }
+        };
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    dispatch.run();
+                }
+            });
+        } else {
+            dispatch.run();
+        }
     }
 }

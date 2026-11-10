@@ -57,7 +57,7 @@ public class KeyRotationService {
             if (online != null && online.isOpen()) {
                 dispatchAfterCommit(() -> {
                     try {
-                        keyDeliveryService.deliverQueuedKeys(recipient.getId(), username, online);
+                        keyDeliveryService.sendNextQueuedPacket(recipient.getId(), username, online);
                     } catch (Exception e) {
                         log.warn("Queued rotation for channel {} retained for retry", channelId, e);
                     }
@@ -103,9 +103,11 @@ public class KeyRotationService {
     public void handleRotationRequest(Long channelId, String senderUsername) {
         log.info("Received rotation request from user {} for channel {}", senderUsername, channelId);
 
-        Set<String> currentMembers = findChannelMemberUsernames(channelId);
-        if (!currentMembers.isEmpty()) {
-            solicitateNewKeyRotation(channelId, currentMembers);
+        Set<String> otherMembers = findChannelMemberUsernames(channelId).stream()
+                .filter(username -> !username.equals(senderUsername))
+                .collect(Collectors.toSet());
+        if (!otherMembers.isEmpty()) {
+            solicitateNewKeyRotation(channelId, otherMembers);
         }
     }
 
@@ -186,7 +188,7 @@ public class KeyRotationService {
         if (session != null && session.isOpen()) {
             Runnable dispatch = () -> {
                 try {
-                    keyDeliveryService.deliverQueuedKeys(recipientUserId, recipient.getUsername(), session);
+                    keyDeliveryService.sendNextQueuedPacket(recipientUserId, recipient.getUsername(), session);
                 } catch (Exception e) {
                     log.warn("Could not dispatch queued key packet to user {} after commit; retained for reconnect",
                             recipientUserId, e);
@@ -213,7 +215,7 @@ public class KeyRotationService {
         AppUser user = appUserRepository.findByUsername(username).orElse(null);
         if (user == null) return;
 
-        keyDeliveryService.deliverQueuedKeys(user.getId(), username, session);
+        keyDeliveryService.sendNextQueuedPacket(user.getId(), username, session);
     }
 
     private Set<String> findChannelMemberUsernames(Long channelId) {

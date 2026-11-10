@@ -1,8 +1,8 @@
 package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.AppUser;
+import cz.upce.fei.ems.backend.domain.ChannelMember;
 import cz.upce.fei.ems.backend.domain.ChannelKey;
-import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.session.SessionRegistry;
@@ -19,6 +19,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -67,6 +68,7 @@ class KeyRotationServiceUnitTest {
 
         verify(channelKeyRepository).save(any(ChannelKey.class));
         verify(userQueue).enqueueForUser(eq(1L), any(byte[].class));
+        verify(keyDeliveryService).sendNextQueuedPacket(1L, "user1", session);
         verify(dispatcher, never()).sendTo(any(), any());
     }
 
@@ -82,6 +84,24 @@ class KeyRotationServiceUnitTest {
     }
 
     @Test
+    void rotationRequestQueuesSolicitationForAnotherChannelMember() {
+        ChannelMember senderMembership = new ChannelMember();
+        senderMembership.setUserId(1L);
+        ChannelMember otherMembership = new ChannelMember();
+        otherMembership.setUserId(2L);
+        when(channelMemberRepository.findByChannelId(10L))
+                .thenReturn(List.of(senderMembership, otherMembership));
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(user(1L, "user1")));
+        when(appUserRepository.findById(2L)).thenReturn(Optional.of(user(2L, "user2")));
+        when(appUserRepository.findByUsername("user2")).thenReturn(Optional.of(user(2L, "user2")));
+
+        keyRotationService.handleRotationRequest(10L, "user1");
+
+        verify(userQueue).enqueueForUser(eq(2L), any(byte[].class));
+        verify(userQueue, never()).enqueueForUser(eq(1L), any(byte[].class));
+    }
+
+    @Test
     void testHandleClientUnicastRotationOnline() throws Exception {
         stubValidUnicastRotation();
         when(sessionRegistry.getSession("user2")).thenReturn(session);
@@ -93,6 +113,7 @@ class KeyRotationServiceUnitTest {
         // The contract is to enqueue even for online recipients. Whether and
         // when a delivery worker is triggered belongs to the backend layer.
         verify(userQueue).enqueueForUser(eq(2L), any(byte[].class));
+        verify(keyDeliveryService).sendNextQueuedPacket(2L, "user2", session);
         verify(dispatcher, never()).sendTo(any(), any());
     }
 

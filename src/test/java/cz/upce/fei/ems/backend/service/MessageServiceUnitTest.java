@@ -6,10 +6,12 @@ import cz.upce.fei.ems.backend.domain.Message;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
+import cz.upce.fei.ems.backend.net.session.SessionRegistry;
 import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.MessageRepository;
+import org.springframework.web.socket.WebSocketSession;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,6 +41,12 @@ class MessageServiceUnitTest {
     private ChannelMemberRepository channelMemberRepository;
     @Mock
     private PostgresUserQueue userQueue;
+    @Mock
+    private SessionRegistry sessionRegistry;
+    @Mock
+    private QueuedKeyDeliveryService queuedPacketDeliveryService;
+    @Mock
+    private WebSocketSession recipientSession;
     @Spy
     private PacketCodec packetCodec = new PacketCodec();
 
@@ -62,9 +71,15 @@ class MessageServiceUnitTest {
         senderMembership.setUserId(sender.getId());
         ChannelMember recipientMembership = new ChannelMember();
         recipientMembership.setUserId(2L);
+        AppUser recipient = new AppUser();
+        recipient.setId(2L);
+        recipient.setUsername("recipient");
         when(appUserRepository.findByUsername("sender")).thenReturn(Optional.of(sender));
         when(channelMemberRepository.findByChannelId(10L))
                 .thenReturn(List.of(senderMembership, recipientMembership));
+        when(appUserRepository.findAllById(Set.of(2L))).thenReturn(List.of(recipient));
+        when(sessionRegistry.getSession("recipient")).thenReturn(recipientSession);
+        when(recipientSession.isOpen()).thenReturn(true);
 
         messageService.processAndQueueMessage("sender", 10L, 100L, ciphertext, packet);
 
@@ -79,6 +94,7 @@ class MessageServiceUnitTest {
         saveBeforeQueue.verify(messageRepository).saveAndFlush(any(Message.class));
         saveBeforeQueue.verify(userQueue).enqueueForUser(eq(2L), queuedFrame.capture());
         verify(userQueue, never()).enqueueForUser(eq(sender.getId()), any(byte[].class));
+        verify(queuedPacketDeliveryService).sendNextQueuedPacket(2L, "recipient", recipientSession);
         Packet decoded = packetCodec.decode(java.nio.ByteBuffer.wrap(queuedFrame.getValue()));
         assertEquals(packet.getType(), decoded.getType());
         assertArrayEquals(packet.getPayload(), decoded.getPayload());

@@ -3,26 +3,18 @@ package cz.upce.fei.ems.backend.wss;
 import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.domain.ChannelKey;
 import cz.upce.fei.ems.backend.domain.ChannelMember;
-import cz.upce.fei.ems.backend.domain.Message;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
-import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
-import cz.upce.fei.ems.backend.queue.QueuedPacket;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class ChatMessageWssIntegrationTest extends BaseWssIntegrationTest {
-
-    @Autowired
-    private PostgresUserQueue userQueue;
 
     @Test
     void shouldQueueMessageForOtherChannelMembers() throws Exception {
@@ -67,7 +59,7 @@ public class ChatMessageWssIntegrationTest extends BaseWssIntegrationTest {
         ChannelKey key = new ChannelKey();
         key.setChannelId(channel.getId());
         key.setVersion(UUID.randomUUID());
-        key = channelKeyRepository.save(key);
+        channelKeyRepository.save(key);
 
         // Connect all users
         TestWebSocketClient client1 = createConnectedClient(token1);
@@ -84,18 +76,20 @@ public class ChatMessageWssIntegrationTest extends BaseWssIntegrationTest {
         byte[] packetPayload = payload.array();
         client1.sendPacket(new Packet(PacketType.CHAT_MESSAGE_ENC.getCode(), packetPayload));
 
-        byte[] expectedFrame = encodeFrame(new Packet(PacketType.CHAT_MESSAGE_ENC.getCode(), packetPayload));
-        assertTrue(awaitQueuedFrame(userId2, expectedFrame), "The first channel member should have a queued frame");
-        assertTrue(awaitQueuedFrame(userId3, expectedFrame), "The second channel member should have a queued frame");
-        assertFalse(hasQueuedFrame(userId1, expectedFrame),
-                "The sender must not receive a queued copy");
-        assertFalse(hasQueuedFrame(userId4, expectedFrame),
-                "A member of another channel must not receive the message");
-        assertNull(client2.awaitPacket(200, TimeUnit.MILLISECONDS), "Message should be queued, not broadcast directly");
-        assertNull(client3.awaitPacket(200, TimeUnit.MILLISECONDS), "Message should be queued, not broadcast directly");
+        Packet received2 = client2.awaitPacket(5, TimeUnit.SECONDS);
+        Packet received3 = client3.awaitPacket(5, TimeUnit.SECONDS);
+        assertNotNull(received2, "The first channel member should receive the queued frame");
+        assertNotNull(received3, "The second channel member should receive the queued frame");
+        assertEquals(PacketType.CHAT_MESSAGE_ENC.getCode(), received2.getType());
+        assertEquals(PacketType.CHAT_MESSAGE_ENC.getCode(), received3.getType());
+        assertArrayEquals(packetPayload, received2.getPayload());
+        assertArrayEquals(packetPayload, received3.getPayload());
+        assertNull(client1.awaitPacket(200, TimeUnit.MILLISECONDS), "Sender must not receive a copy");
+        assertNull(client4.awaitPacket(200, TimeUnit.MILLISECONDS), "Unrelated channel member must not receive it");
         assertArrayEquals(content, messageRepository.findTop50ByChannelIdOrderBySentAtDescIdDesc(channel.getId())
-                .get(0).getCiphertext());
+                .getFirst().getCiphertext());
 
+        client2.sendPacket(new Packet(PacketType.ACKNOWLEDGE.getCode(), new byte[0]));
         client1.getSession().close();
         client2.getSession().close();
         client3.getSession().close();
@@ -138,27 +132,4 @@ public class ChatMessageWssIntegrationTest extends BaseWssIntegrationTest {
         client.getSession().close();
     }
 
-    private boolean awaitQueuedFrame(long userId, byte[] expectedFrame) throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (System.nanoTime() < deadline) {
-            List<QueuedPacket> packets = userQueue.claimForUser(userId, 10, 100);
-            if (packets.stream().anyMatch(packet -> java.util.Arrays.equals(packet.frame(), expectedFrame))) {
-                return true;
-            }
-            Thread.sleep(100);
-        }
-        return false;
-    }
-
-    private boolean hasQueuedFrame(long userId, byte[] expectedFrame) {
-        return userQueue.claimForUser(userId, 10, 100).stream()
-                .anyMatch(packet -> java.util.Arrays.equals(packet.frame(), expectedFrame));
-    }
-
-    private byte[] encodeFrame(Packet packet) {
-        ByteBuffer encoded = packetCodec.encode(packet);
-        byte[] frame = new byte[encoded.remaining()];
-        encoded.get(frame);
-        return frame;
-    }
 }

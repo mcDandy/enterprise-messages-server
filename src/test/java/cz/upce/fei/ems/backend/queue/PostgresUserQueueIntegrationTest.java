@@ -107,6 +107,23 @@ class PostgresUserQueueIntegrationTest {
     }
 
     @Test
+    void peeksAndAcknowledgesQueueHeadInFifoOrder() {
+        long user = createTestQueue();
+        byte[] first = new byte[]{0x01, 10};
+        byte[] second = new byte[]{0x02, 20};
+        queue.enqueueForUser(user, first);
+        queue.enqueueForUser(user, second);
+
+        assertArrayEquals(first, queue.peekFirstForUser(user).getFirst().frame());
+        assertArrayEquals(first, queue.peekFirstForUser(user).getFirst().frame());
+        assertTrue(queue.acknowledgeFirstForUser(user));
+        assertArrayEquals(second, queue.peekFirstForUser(user).getFirst().frame());
+        assertTrue(queue.acknowledgeFirstForUser(user));
+        assertFalse(queue.acknowledgeFirstForUser(user));
+        assertTrue(queue.peekFirstForUser(user).isEmpty());
+    }
+
+    @Test
     void retriesUnacknowledgedFrameAfterVisibilityTimeout() throws InterruptedException {
         long user = createTestQueue();
         long id = queue.enqueueForUser(user, new byte[]{0x01, 99});

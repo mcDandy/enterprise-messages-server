@@ -53,14 +53,14 @@ public class KeyRotationWssIntegrationTest extends BaseWssIntegrationTest {
         // Client 1 sends Rotate Key Request
         client1.sendPacket(new Packet(PacketType.ROTATE_KEY.getCode(), new byte[0]));
 
-        // Server should respond with a ROTATE_KEY solicitation to SOMEONE in the channel
+        // Server should solicit another channel member, not the requester.
         Packet solicitation1 = client1.awaitPacket(2, TimeUnit.SECONDS);
         Packet solicitation2 = client2.awaitPacket(2, TimeUnit.SECONDS);
 
-        assertTrue(solicitation1 != null || solicitation2 != null, 
-            "One of the points should have received a rotation solicitation");
+        assertNull(solicitation1, "The requester must not receive their own rotation solicitation");
+        assertNotNull(solicitation2, "Another channel member should receive the rotation solicitation");
 
-        Packet received = (solicitation1 != null) ? solicitation1 : solicitation2;
+        Packet received = solicitation2;
         assertEquals(PacketType.ROTATE_KEY.getCode(), received.getType());
 
         client1.getSession().close();
