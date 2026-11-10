@@ -52,4 +52,4 @@ firebase-service-account.json
 
 # Private instance configurations
 .env.*
-!.env.example
+!.env.example-old

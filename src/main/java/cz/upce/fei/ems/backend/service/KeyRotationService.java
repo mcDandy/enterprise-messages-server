@@ -2,7 +2,8 @@ package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.*;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
-import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
+import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
+import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
 import cz.upce.fei.ems.backend.net.session.SessionRegistry;
 import cz.upce.fei.ems.backend.repository.*;
@@ -10,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
@@ -22,13 +25,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class KeyRotationService {
     private final SessionRegistry sessionRegistry;
-    private final PacketDispatcher dispatcher;
     private final ChannelKeyRepository channelKeyRepository;
     private final ChannelMemberRepository channelMemberRepository;
     private final AppUserRepository appUserRepository;
-    private final ChannelKeyPendingRepository channelKeyPendingRepository;
-    private final ChannelRotationPendingRepository channelRotationPendingRepository;
-
+    private final PostgresUserQueue userQueue;
+    private final PacketCodec packetCodec;
+    private final QueuedKeyDeliveryService keyDeliveryService;
 
     @Transactional
     public void solicitateNewKeyRotation(Long channelId, Set<String> currentChannelMembers) {
@@ -37,23 +39,41 @@ public class KeyRotationService {
 
     private void doSolicitateNewKeyRotation(Long channelId, Set<String> currentChannelMembers) {
         try {
-            WebSocketSession selected = selectOnlineClient(currentChannelMembers);
-            if (selected == null) {
-                log.warn(
-                        "No online client available for channel {}. Storing pending rotation trigger in DB.",
-                        channelId
-                );
-                //todo add to front
-                return;
-            }
+            // Only one member should initiate the new key distribution.
+            // Prefer an online member; if everyone is offline, choose a stable recipient.
+            WebSocketSession online = selectOnlineClient(currentChannelMembers);
+            String username = online != null
+                    ? (String) online.getAttributes().get("username")
+                    : currentChannelMembers.stream().sorted().findFirst().orElse(null);
+            if (username == null) return;
+            AppUser recipient = appUserRepository.findByUsername(username).orElse(null);
+            if (recipient == null) throw new IllegalStateException("Rotation recipient not found");
 
-            UUID uuid = createNextChannelKey(channelId);
-            log.info("Initiating key rotation for channel {} using client: {} (requestId: {})",
-                    channelId, selected.getAttributes().get("username"), uuid);
-            dispatcher.sendTo(selected, createRotationPacket(channelId, uuid));
+            UUID version = createNextChannelKey(channelId);
+            Packet packet = createRotationPacket(channelId, version);
+            userQueue.enqueueForUser(recipient.getId(), encodeFrame(packet));
+            log.info("Queued key rotation for channel {} to user {} (requestId: {})",
+                    channelId, recipient.getId(), version);
+            if (online != null && online.isOpen()) {
+                dispatchAfterCommit(() -> {
+                    try {
+                        keyDeliveryService.deliverQueuedKeys(recipient.getId(), username, online);
+                    } catch (Exception e) {
+                        log.warn("Queued rotation for channel {} retained for retry", channelId, e);
+                    }
+                });
+            }
         } catch (Exception e) {
-            log.error("Failed to send rotation solicitation for channel {}: {}", channelId, e.getMessage(), e);
+            log.error("Failed to schedule key rotation for channel {}", channelId, e);
+            throw new IllegalStateException("Could not schedule channel key rotation", e);
         }
+    }
+
+    private byte[] encodeFrame(Packet packet) {
+        ByteBuffer encoded = packetCodec.encode(packet);
+        byte[] frame = new byte[encoded.remaining()];
+        encoded.get(frame);
+        return frame;
     }
 
     private UUID createNextChannelKey(Long channelId) {
@@ -96,6 +116,7 @@ public class KeyRotationService {
         logUnicastRotationRequest(channelId, senderUsername, recipientUserId);
         if (!areBothUsersChannelMembers(channelId, senderUserId, recipientUserId)) {
             log.error("User {} and user {} are not together in channel {}", senderUsername, recipientUserId, channelId);
+            throw new SecurityException("Sender or recipient is not a member of channel " + channelId);
         }
 
         Optional<ChannelKey> activeChannelKey = findActiveChannelKey(
@@ -112,6 +133,7 @@ public class KeyRotationService {
         } catch (Exception e) {
             log.error("Failed to process unicast key rotation ciphertext from user {} to user {}: {}",
                     senderUsername, recipientUserId, e.getMessage(), e);
+            throw new IllegalStateException("Failed to store/send key rotation", e);
         }
     }
 
@@ -149,7 +171,7 @@ public class KeyRotationService {
 
     private void forwardOrQueueUnicastRotation(
             Long channelId, Long senderUserId, Long recipientUserId, byte[] ciphertext, ChannelKey channelKey
-    ) throws Exception {
+    ) {
         AppUser recipient = appUserRepository.findById(recipientUserId).orElse(null);
         if (recipient == null) {
             log.warn("Recipient user ID {} not found in database during unicast key rotation.", recipientUserId);
@@ -157,13 +179,24 @@ public class KeyRotationService {
         }
 
         Packet packet = createUnicastRotationPacket(senderUserId, channelKey, ciphertext);
+        // Persist the complete encoded packet *before* dispatching it, whether
+        // the recipient is online or offline. Queue insert uses the same DB txn.
+        userQueue.enqueueForUser(recipientUserId, encodeFrame(packet));
         WebSocketSession session = sessionRegistry.getSession(recipient.getUsername());
         if (session != null && session.isOpen()) {
-            dispatcher.sendTo(session, packet);
-            log.info("Forwarded unicast key rotation ciphertext to online user ID {}", recipientUserId);
-            return;
+            Runnable dispatch = () -> {
+                try {
+                    keyDeliveryService.deliverQueuedKeys(recipientUserId, recipient.getUsername(), session);
+                } catch (Exception e) {
+                    log.warn("Could not dispatch queued key packet to user {} after commit; retained for reconnect",
+                            recipientUserId, e);
+                }
+            };
+            dispatchAfterCommit(dispatch);
+        } else {
+            log.info("Recipient user ID {} is offline; complete key packet queued for channel {}.",
+                    recipientUserId, channelId);
         }
-        queueUnicastRotation(channelId, recipientUserId, ciphertext);
     }
 
     private Packet createUnicastRotationPacket(Long senderUserId, ChannelKey channelKey, byte[] ciphertext) {
@@ -175,59 +208,12 @@ public class KeyRotationService {
         return new Packet(PacketType.UNICAST_KEY_ROTATION.getCode(), payload.array());
     }
 
-    private void queueUnicastRotation(Long channelId, Long recipientUserId, byte[] ciphertext) {
-        // TODO: Replace the pending-key table with a proper queue.
-        ChannelKeyPending pending = new ChannelKeyPending();
-        pending.setChannelId(channelId);
-        pending.setRecipientUserId(recipientUserId);
-        pending.setCiphertext(ciphertext);
-        channelKeyPendingRepository.save(pending);
-        log.warn("Recipient user ID {} is offline. Ciphertext stored in DB queue for channel {}.",
-                recipientUserId, channelId);
-    }
-
     @Transactional
     public void processPendingOnConnect(String username, WebSocketSession session) {
         AppUser user = appUserRepository.findByUsername(username).orElse(null);
         if (user == null) return;
 
-        sendPendingKeys(username, user.getId(), session);
-        processPendingRotationTriggers(username, user.getId());
-    }
-
-    private void sendPendingKeys(String username, Long userId, WebSocketSession session) {
-        List<ChannelKeyPending> pendingKeys = channelKeyPendingRepository.findByRecipientUserId(userId);
-        if (!pendingKeys.isEmpty()) {
-            log.info("Flushing {} pending key rotation packets for reconnected user {}", pendingKeys.size(), username);
-            for (ChannelKeyPending pending : pendingKeys) {
-                try {
-                    Packet packet = new Packet(PacketType.UNICAST_KEY_ROTATION.getCode(), pending.getCiphertext());
-                    dispatcher.sendTo(session, packet);
-                } catch (Exception e) {
-                    log.error("Failed to send pending key rotation to user {}: {}", username, e.getMessage());
-                }
-            }
-            channelKeyPendingRepository.deleteAll(pendingKeys);
-        }
-    }
-
-    private void processPendingRotationTriggers(String username, Long userId) {
-        List<Long> channelIds = channelMemberRepository.findByUserId(userId).stream()
-                .map(ChannelMember::getChannelId)
-                .toList();
-        channelIds.forEach(channelId -> processPendingRotation(username, channelId));
-    }
-
-    private void processPendingRotation(String username, Long channelId) {
-        channelRotationPendingRepository.findByChannelId(channelId).ifPresent(pending -> {
-            log.info(
-                    "Found pending rotation trigger for channel {} upon user {} connection. Initiating...",
-                    channelId,
-                    username
-            );
-            channelRotationPendingRepository.deleteByChannelId(channelId);
-            doSolicitateNewKeyRotation(channelId, findChannelMemberUsernames(channelId));
-        });
+        keyDeliveryService.deliverQueuedKeys(user.getId(), username, session);
     }
 
     private Set<String> findChannelMemberUsernames(Long channelId) {
@@ -236,6 +222,19 @@ public class KeyRotationService {
                 .filter(Objects::nonNull)
                 .map(AppUser::getUsername)
                 .collect(Collectors.toSet());
+    }
+
+    private void dispatchAfterCommit(Runnable dispatch) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    dispatch.run();
+                }
+            });
+        } else {
+            dispatch.run();
+        }
     }
 
     private WebSocketSession selectOnlineClient(Set<String> members) {

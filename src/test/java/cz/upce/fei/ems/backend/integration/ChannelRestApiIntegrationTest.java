@@ -18,7 +18,6 @@ import tools.jackson.databind.JsonNode;
 
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -98,10 +97,9 @@ public class ChannelRestApiIntegrationTest extends BaseRestApiIntegrationTest {
         Long channelId = objectMapper.readTree(createResponse.body()).get("id").asLong();
 
         Long userId = userRepository.findByUsername("channel_delete").orElseThrow().getId();
-        ChannelKey channelKey = new ChannelKey();
-        channelKey.setChannelId(channelId);
-        channelKey.setVersion(UUID.randomUUID());
-        channelKey = channelKeyRepository.save(channelKey);
+        // Channel creation already schedules rotation and creates an active key version.
+        ChannelKey channelKey = channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId)
+                .orElseThrow();
 
         Message message = new Message();
         message.setChannelId(channelId);

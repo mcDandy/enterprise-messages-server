@@ -1,10 +1,15 @@
 package cz.upce.fei.ems.backend.service;
 
-import cz.upce.fei.ems.backend.domain.*;
+import cz.upce.fei.ems.backend.domain.AppUser;
+import cz.upce.fei.ems.backend.domain.ChannelKey;
+import cz.upce.fei.ems.backend.net.protocol.Packet;
+import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.session.SessionRegistry;
-import cz.upce.fei.ems.backend.repository.*;
-import org.junit.jupiter.api.BeforeEach;
+import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
+import cz.upce.fei.ems.backend.repository.AppUserRepository;
+import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
+import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -12,15 +17,19 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.socket.WebSocketSession;
 
-import java.util.*;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
 class KeyRotationServiceUnitTest {
-
     @Mock
     private SessionRegistry sessionRegistry;
     @Mock
@@ -32,81 +41,101 @@ class KeyRotationServiceUnitTest {
     @Mock
     private AppUserRepository appUserRepository;
     @Mock
-    private ChannelKeyPendingRepository channelKeyPendingRepository;
+    private PostgresUserQueue userQueue;
+    @org.mockito.Spy
+    private PacketCodec packetCodec = new PacketCodec();
     @Mock
-    private ChannelRotationPendingRepository channelRotationPendingRepository;
+    private QueuedKeyDeliveryService keyDeliveryService;
+    @Mock
+    private WebSocketSession session;
 
     @InjectMocks
     private KeyRotationService keyRotationService;
 
-    @Mock
-    private WebSocketSession session;
-
-    @BeforeEach
-    void setUp() {
-    }
-
     @Test
     void testSolicitateNewKeyRotationOnline() throws Exception {
-        Set<String> members = Set.of("user1");
         when(sessionRegistry.getSession("user1")).thenReturn(session);
         when(session.isOpen()).thenReturn(true);
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("username", "user1");
         when(session.getAttributes()).thenReturn(attributes);
-        when(channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(10L)).thenReturn(Optional.empty());
+        when(channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(10L))
+                .thenReturn(Optional.empty());
 
-        keyRotationService.solicitateNewKeyRotation(10L, members);
+        when(appUserRepository.findByUsername("user1")).thenReturn(Optional.of(user(1L, "user1")));
+        keyRotationService.solicitateNewKeyRotation(10L, Set.of("user1"));
 
         verify(channelKeyRepository).save(any(ChannelKey.class));
-        verify(dispatcher).sendTo(eq(session), any());
+        verify(userQueue).enqueueForUser(eq(1L), any(byte[].class));
+        verify(dispatcher, never()).sendTo(any(), any());
     }
 
     @Test
     void testSolicitateNewKeyRotationOffline() throws Exception {
-        Set<String> members = Set.of("user1");
-        when(sessionRegistry.getSession("user1")).thenReturn(null);
+        when(appUserRepository.findByUsername("user1")).thenReturn(Optional.of(user(1L, "user1")));
+        keyRotationService.solicitateNewKeyRotation(10L, Set.of("user1"));
 
-        keyRotationService.solicitateNewKeyRotation(10L, members);
-
-        verify(channelKeyRepository, never()).save(any(ChannelKey.class));
+        verify(channelKeyRepository).save(any(ChannelKey.class));
+        verify(userQueue).enqueueForUser(eq(1L), any(byte[].class));
+        verifyNoInteractions(keyDeliveryService);
         verify(dispatcher, never()).sendTo(any(), any());
     }
 
     @Test
     void testHandleClientUnicastRotationOnline() throws Exception {
-        when(channelMemberRepository.existsByChannelIdAndUserId(10L, 1L)).thenReturn(true);
-        when(channelMemberRepository.existsByChannelIdAndUserId(10L, 2L)).thenReturn(true);
-        ChannelKey key = new ChannelKey();
-        key.setVersion(UUID.randomUUID());
-        when(channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(10L)).thenReturn(Optional.of(key));
-        AppUser recipient = new AppUser();
-        recipient.setUsername("user2");
-        when(appUserRepository.findById(2L)).thenReturn(Optional.of(recipient));
+        stubValidUnicastRotation();
         when(sessionRegistry.getSession("user2")).thenReturn(session);
         when(session.isOpen()).thenReturn(true);
 
-        keyRotationService.handleClientUnicastRotation(10L, 1L, "user1", 2L, "cipher".getBytes());
+        keyRotationService.handleClientUnicastRotation(
+                10L, 1L, "user1", 2L, "cipher".getBytes(StandardCharsets.UTF_8));
 
-        verify(dispatcher).sendTo(eq(session), any());
-        verify(channelKeyPendingRepository, never()).save(any());
+        // The contract is to enqueue even for online recipients. Whether and
+        // when a delivery worker is triggered belongs to the backend layer.
+        verify(userQueue).enqueueForUser(eq(2L), any(byte[].class));
+        verify(dispatcher, never()).sendTo(any(), any());
     }
 
     @Test
     void testHandleClientUnicastRotationOffline() throws Exception {
+        stubValidUnicastRotation();
+
+        keyRotationService.handleClientUnicastRotation(
+                10L, 1L, "user1", 2L, "cipher".getBytes(StandardCharsets.UTF_8));
+
+        verify(userQueue).enqueueForUser(eq(2L), any(byte[].class));
+        verifyNoInteractions(keyDeliveryService);
+        verify(dispatcher, never()).sendTo(any(), any());
+    }
+
+    @Test
+    void rejectsUnicastForRecipientOutsideChannelWithoutEnqueuing() {
+        when(channelMemberRepository.existsByChannelIdAndUserId(10L, 1L)).thenReturn(true);
+        when(channelMemberRepository.existsByChannelIdAndUserId(10L, 2L)).thenReturn(false);
+
+        assertThrows(SecurityException.class, () -> keyRotationService.handleClientUnicastRotation(
+                10L, 1L, "user1", 2L, "cipher".getBytes(StandardCharsets.UTF_8)));
+        verifyNoInteractions(userQueue);
+    }
+
+    private static AppUser user(long id, String username) {
+        AppUser user = new AppUser();
+        user.setId(id);
+        user.setUsername(username);
+        return user;
+    }
+
+    private void stubValidUnicastRotation() {
         when(channelMemberRepository.existsByChannelIdAndUserId(10L, 1L)).thenReturn(true);
         when(channelMemberRepository.existsByChannelIdAndUserId(10L, 2L)).thenReturn(true);
-        ChannelKey key = new ChannelKey();
-        key.setVersion(UUID.randomUUID());
-        when(channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(10L)).thenReturn(Optional.of(key));
+
+        ChannelKey channelKey = new ChannelKey();
+        channelKey.setVersion(UUID.randomUUID());
+        when(channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(10L))
+                .thenReturn(Optional.of(channelKey));
+
         AppUser recipient = new AppUser();
         recipient.setUsername("user2");
         when(appUserRepository.findById(2L)).thenReturn(Optional.of(recipient));
-        when(sessionRegistry.getSession("user2")).thenReturn(null);
-
-        keyRotationService.handleClientUnicastRotation(10L, 1L, "user1", 2L, "cipher".getBytes());
-
-        verify(dispatcher, never()).sendTo(any(), any());
-        verify(channelKeyPendingRepository).save(any(ChannelKeyPending.class));
     }
 }

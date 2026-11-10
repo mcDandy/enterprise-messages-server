@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.JsonNode;
 
 import java.net.http.HttpResponse;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -41,10 +40,9 @@ public class MessageRestApiIntegrationTest extends BaseRestApiIntegrationTest {
         HttpResponse<String> channelResp = post("/api/servers/" + serverId + "/channels", token, channelReq);
         Long channelId = objectMapper.readTree(channelResp.body()).get("id").asLong();
         
-        ChannelKey key = new ChannelKey();
-        key.setChannelId(channelId);
-        key.setVersion(UUID.randomUUID());
-        key = channelKeyRepository.save(key);
+        // Channel creation already schedules rotation and creates an active key version.
+        ChannelKey key = channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId)
+                .orElseThrow();
 
         // Insert message
         Message msg = new Message();

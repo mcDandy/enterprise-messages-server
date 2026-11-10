@@ -21,11 +21,8 @@ import java.time.Duration;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
-    "spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL",
-    "spring.datasource.driver-class-name=org.h2.Driver",
-    "spring.jpa.hibernate.ddl-auto=create-drop",
-    "JWT_SECRET=integration-test-secret-key-at-least-32-characters-long-so-it-is-safe",
-    "JWT_EXPIRATION=3600000"
+        "JWT_SECRET=integration-test-secret-key-at-least-32-characters-long-so-it-is-safe",
+        "JWT_EXPIRATION=3600000"
 })
 public abstract class BaseRestApiIntegrationTest {
 
@@ -55,7 +52,7 @@ public abstract class BaseRestApiIntegrationTest {
         LoginRequestDto loginRequest = new LoginRequestDto();
         loginRequest.setUsername(username);
         loginRequest.setPassword(password);
-        
+
         HttpResponse<String> response = post("/api/auth/login", null, loginRequest);
         if (response.statusCode() != 200) {
             RegisterRequestDto registerRequest = new RegisterRequestDto();
@@ -63,10 +60,10 @@ public abstract class BaseRestApiIntegrationTest {
             registerRequest.setPassword(password);
             registerRequest.setPublicKey("initial-key");
             post("/api/auth/register", null, registerRequest);
-            
+
             response = post("/api/auth/login", null, loginRequest);
         }
-        
+
         JsonNode node = objectMapper.readTree(response.body());
         return node.get("token").asText();
     }

@@ -1,7 +1,7 @@
 services:
   db:
     container_name: ${DB_CONTAINER_NAME:-db}
-    image: postgres:17
+    image: ghcr.io/pgmq/pg17-pgmq:v1.10.0
     environment:
       POSTGRES_DB: nnpro
       POSTGRES_USER: nnpro
@@ -91,34 +91,19 @@ services:
         condition: service_healthy
 
   db-test:
-    image: postgres:17
+    profiles: ["test"]
+    image: ghcr.io/pgmq/pg17-pgmq:v1.10.0
     environment:
       POSTGRES_DB: nnpro_test
       POSTGRES_USER: nnpro
       POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:-nnpro_local_test}
-    # Never uses the application's postgres_data volume.
-    tmpfs:
-      - /var/lib/postgresql/data
     volumes:
+      - pgmq_test_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    # Keep this readiness check schema-agnostic: migrate-test applies 001-005
+    # only *after* db-test is healthy. Checking pending tables here deadlocks it.
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >-
-          pg_isready -U nnpro -d nnpro_test &&
-          psql -X -U nnpro -d nnpro_test -Atc
-          "SELECT CASE WHEN
-          to_regclass('public.message_channel') IS NOT NULL
-          AND to_regclass('public.channel') IS NULL
-          AND to_regclass('public.channel_key_pending') IS NOT NULL
-          AND to_regclass('public.channel_rotation_pending') IS NOT NULL
-          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='message_channel_key' AND column_name='version' AND data_type='uuid')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='message_channel_key' AND column_name='key_hash')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='app_user' AND column_name='fcm_token')
-          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='app_user' AND column_name='is_banned' AND data_type='boolean')
-          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='app_user' AND column_name='is_main_admin')
-          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='message_receipt' AND column_name='message_channel_id')
-          THEN 1 ELSE 0 END" | grep -qx 1
+      test: ["CMD-SHELL", "pg_isready -U nnpro -d nnpro_test"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -127,6 +112,7 @@ services:
       - "127.0.0.1:${TEST_DB_HOST_PORT:-55432}:5432"
 
   migrate-test:
+    profiles: ["test"]
     image: postgres:17
     environment:
       PGHOST: db-test
@@ -170,3 +156,4 @@ services:
 
 volumes:
   postgres_data:
+  pgmq_test_data:

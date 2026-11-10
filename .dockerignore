@@ -5,7 +5,7 @@ build
 *.iml
 .env
 .env.*
-!.env.example
+!.env.example-old
 *.log
 certs/
 *.p12
