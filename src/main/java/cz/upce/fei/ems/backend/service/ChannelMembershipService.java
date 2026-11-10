@@ -9,8 +9,9 @@ import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.Objects;
+
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -49,9 +50,8 @@ public class ChannelMembershipService {
     }
 
     private void validateTargetMembership(Long channelId, Long targetUserId) {
-        if (!appUserRepository.existsById(targetUserId)) {
-            throw new IllegalArgumentException("Target user with ID " + targetUserId + " not found");
-        }
+        appUserRepository.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Target user with ID " + targetUserId + " not found"));
         if (channelMemberRepository.existsByChannelIdAndUserId(channelId, targetUserId)) {
             throw new IllegalStateException("User is already a member of this channel.");
         }

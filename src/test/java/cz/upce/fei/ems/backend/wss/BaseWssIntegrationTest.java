@@ -60,7 +60,7 @@ public abstract class BaseWssIntegrationTest extends BaseRestApiIntegrationTest 
         if (serverSession != null) {
             if (channelId != null) {
                 serverSession.getAttributes().put("currentChannelId", channelId);
-                // Also manually join in registry as it's not done automatically
+                // Key-rotation tests still use a selected channel; chat packets carry their own channel ID.
                 sessionRegistry.joinChannel(channelId, username);
             }
             if (channelKeyId != null) {

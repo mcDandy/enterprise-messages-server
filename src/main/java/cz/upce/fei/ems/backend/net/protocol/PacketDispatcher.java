@@ -8,6 +8,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -40,6 +41,12 @@ public class PacketDispatcher {
     public void broadcastToChannel(Long channelId, Packet packet) throws Exception {
         for (WebSocketSession session : sessionRegistry.getSessionsInChannel(channelId)) {
             sendTo(session, packet);
+        }
+    }
+
+    public void broadcastToUsers(Set<String> usernames, Packet packet) throws Exception {
+        for (String username : usernames) {
+            sendToUser(username, packet);
         }
     }
 }

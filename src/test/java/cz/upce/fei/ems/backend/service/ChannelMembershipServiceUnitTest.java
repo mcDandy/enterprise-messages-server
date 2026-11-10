@@ -1,5 +1,6 @@
 package cz.upce.fei.ems.backend.service;
 
+import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.domain.ChannelMember;
 import cz.upce.fei.ems.backend.domain.ChannelMemberId;
@@ -50,9 +51,12 @@ class ChannelMembershipServiceUnitTest {
 
     @Test
     void testAddMemberSuccess() {
+        AppUser target = new AppUser();
+        target.setId(2L);
+        target.setUsername("target");
         when(channelRepository.findById(1L)).thenReturn(Optional.of(channel));
         when(serverService.isUserAdmin(10L, "admin")).thenReturn(true);
-        when(appUserRepository.existsById(2L)).thenReturn(true);
+        when(appUserRepository.findById(2L)).thenReturn(Optional.of(target));
         when(channelMemberRepository.existsByChannelIdAndUserId(1L, 2L)).thenReturn(false);
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 2L)).thenReturn(true);
 
