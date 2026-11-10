@@ -203,8 +203,8 @@ Each binary WebSocket frame starts with a 1-byte packet type. For
 `CHAT_MESSAGE_ENC` (`0x01`), the remaining payload is a 4-byte unsigned
 big-endian channel ID followed by the encrypted message bytes. The channel ID
 must identify a channel the authenticated sender belongs to. The server stores
-only the encrypted message bytes and broadcasts the complete packet to online
-members of that channel.
+only the encrypted message bytes and enqueues the complete packet for each
+other member of that channel, using each member's user queue.
 
 ## Persistent user packet queues (PGMQ)
 

@@ -6,10 +6,14 @@ import cz.upce.fei.ems.backend.domain.ChannelMember;
 import cz.upce.fei.ems.backend.domain.Message;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
+import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
+import cz.upce.fei.ems.backend.queue.QueuedPacket;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -17,8 +21,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class ChatMessageWssIntegrationTest extends BaseWssIntegrationTest {
 
+    @Autowired
+    private PostgresUserQueue userQueue;
+
     @Test
-    void shouldSendMessageAndBroadcastToAllChannelMembers() throws Exception {
+    void shouldQueueMessageForOtherChannelMembers() throws Exception {
         // Setup: Three users, one channel, one channel key
         String username1 = "chat_u1_" + UUID.randomUUID().toString().replace("-", "");
         String username2 = "chat_u2_" + UUID.randomUUID().toString().replace("-", "");
@@ -77,16 +84,15 @@ public class ChatMessageWssIntegrationTest extends BaseWssIntegrationTest {
         byte[] packetPayload = payload.array();
         client1.sendPacket(new Packet(PacketType.CHAT_MESSAGE_ENC.getCode(), packetPayload));
 
-        // Both Client 2 and Client 3 should receive it (broadcast)
-        Packet p2 = client2.awaitPacket(5, TimeUnit.SECONDS);
-        Packet p3 = client3.awaitPacket(5, TimeUnit.SECONDS);
-        Packet unrelatedChannelPacket = client4.awaitPacket(500, TimeUnit.MILLISECONDS);
-        
-        assertNotNull(p2, "Client 2 should receive message");
-        assertNotNull(p3, "Client 3 should receive message");
-        assertNull(unrelatedChannelPacket, "A member of another channel should not receive the message");
-        assertArrayEquals(packetPayload, p2.getPayload());
-        assertArrayEquals(packetPayload, p3.getPayload());
+        byte[] expectedFrame = encodeFrame(new Packet(PacketType.CHAT_MESSAGE_ENC.getCode(), packetPayload));
+        assertTrue(awaitQueuedFrame(userId2, expectedFrame), "The first channel member should have a queued frame");
+        assertTrue(awaitQueuedFrame(userId3, expectedFrame), "The second channel member should have a queued frame");
+        assertFalse(hasQueuedFrame(userId1, expectedFrame),
+                "The sender must not receive a queued copy");
+        assertFalse(hasQueuedFrame(userId4, expectedFrame),
+                "A member of another channel must not receive the message");
+        assertNull(client2.awaitPacket(200, TimeUnit.MILLISECONDS), "Message should be queued, not broadcast directly");
+        assertNull(client3.awaitPacket(200, TimeUnit.MILLISECONDS), "Message should be queued, not broadcast directly");
         assertArrayEquals(content, messageRepository.findTop50ByChannelIdOrderBySentAtDescIdDesc(channel.getId())
                 .get(0).getCiphertext());
 
@@ -130,5 +136,29 @@ public class ChatMessageWssIntegrationTest extends BaseWssIntegrationTest {
         assertTrue(new String(error.getPayload(), StandardCharsets.UTF_8).contains("not a member"));
         assertTrue(messageRepository.findTop50ByChannelIdOrderBySentAtDescIdDesc(channel.getId()).isEmpty());
         client.getSession().close();
+    }
+
+    private boolean awaitQueuedFrame(long userId, byte[] expectedFrame) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            List<QueuedPacket> packets = userQueue.claimForUser(userId, 10, 100);
+            if (packets.stream().anyMatch(packet -> java.util.Arrays.equals(packet.frame(), expectedFrame))) {
+                return true;
+            }
+            Thread.sleep(100);
+        }
+        return false;
+    }
+
+    private boolean hasQueuedFrame(long userId, byte[] expectedFrame) {
+        return userQueue.claimForUser(userId, 10, 100).stream()
+                .anyMatch(packet -> java.util.Arrays.equals(packet.frame(), expectedFrame));
+    }
+
+    private byte[] encodeFrame(Packet packet) {
+        ByteBuffer encoded = packetCodec.encode(packet);
+        byte[] frame = new byte[encoded.remaining()];
+        encoded.get(frame);
+        return frame;
     }
 }

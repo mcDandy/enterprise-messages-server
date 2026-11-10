@@ -14,8 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -70,14 +68,7 @@ public class ChatMessageHandler implements PacketHandler {
         buffer.get(ciphertext);
 
         try {
-            messageService.processAndSaveMessage(senderUsername, channelId, channelKeyId, ciphertext);
-            Set<Long> memberIds = channelMemberRepository.findByChannelId(channelId).stream()
-                    .map(member -> member.getUserId())
-                    .collect(Collectors.toSet());
-            Set<String> memberUsernames = appUserRepository.findAllById(memberIds).stream()
-                    .map(AppUser::getUsername)
-                    .collect(Collectors.toSet());
-            dispatcher.broadcastToUsers(memberUsernames, packet);
+            messageService.processAndQueueMessage(senderUsername, channelId, channelKeyId, ciphertext, packet);
         } catch (IllegalStateException | IllegalArgumentException e) {
             dispatcher.sendError(session, e.getMessage());
         }
