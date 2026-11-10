@@ -13,11 +13,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -61,15 +58,6 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDto> login(@Valid @RequestBody LoginRequestDto request) {
         return ResponseEntity.ok(authService.authenticate(request));
-    }
-
-    @Operation(
-            summary = "Get User Public Key",
-            description = "Returns the public E2EE key for a given user so the sender can encrypt a message for them."
-    )
-    @GetMapping(value = "/public-key/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Map<String, String>> getPublicKey(@PathVariable Long id) {
-        return ResponseEntity.ok(authService.getPublicKeyResponse(id));
     }
 
     @Operation(

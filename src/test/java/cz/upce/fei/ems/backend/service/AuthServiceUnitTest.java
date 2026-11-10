@@ -1,7 +1,6 @@
 package cz.upce.fei.ems.backend.service;
 
 import cz.upce.fei.ems.backend.domain.AppUser;
-import cz.upce.fei.ems.backend.domain.UserKey;
 import cz.upce.fei.ems.backend.dto.AuthResponseDto;
 import cz.upce.fei.ems.backend.dto.LoginRequestDto;
 import cz.upce.fei.ems.backend.dto.RegisterRequestDto;
@@ -117,14 +116,4 @@ class AuthServiceUnitTest {
         assertThrows(SecurityException.class, () -> authService.authenticate(loginRequest));
     }
 
-    @Test
-    void testGetPublicKeySuccess() {
-        UserKey userKey = new UserKey();
-        userKey.setPublicKey("key");
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userKeyRepository.findByUserIdAndRevokedAtIsNull(1L)).thenReturn(Optional.of(userKey));
-
-        String key = authService.getPublicKey(1L);
-        assertEquals("key", key);
-    }
 }

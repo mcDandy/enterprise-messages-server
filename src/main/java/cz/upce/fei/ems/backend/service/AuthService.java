@@ -18,8 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Map;
-
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -75,24 +73,6 @@ public class AuthService {
         String token = jwtService.generateToken(user.getUsername());
 
         return AuthResponseDto.fromToken(token, user.getUsername(), jwtService.getExpirationTimestamp(token));
-    }
-
-    public String getPublicKey(Long id) {
-        AppUser user = userRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "User not found"
-                ));
-
-        return userKeyRepository
-                .findByUserIdAndRevokedAtIsNull(user.getId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Active public key not found"
-                ))
-                .getPublicKey();
-    }
-
-    public Map<String, String> getPublicKeyResponse(Long id) {
-        return Map.of("publicKey", getPublicKey(id));
     }
 
     public AuthResponseDto refreshToken(RefreshTokenRequestDto request) {

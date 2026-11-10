@@ -59,20 +59,9 @@ public class AuthRestApiIntegrationTest extends BaseRestApiIntegrationTest {
     }
 
     @Test
-    void shouldGetUserPublicKey() throws Exception {
-        String username = "key_user_" + UUID.randomUUID().toString().replace("-", "");
-        RegisterRequestDto registerRequest = new RegisterRequestDto();
-        registerRequest.setUsername(username);
-        registerRequest.setPassword("TestPassword123!");
-        registerRequest.setPublicKey("target-public-key");
+    void publicKeyLookupIsNotExposedUnderAuthApi() throws Exception {
+        HttpResponse<String> response = get("/api/auth/public-key/1", null);
 
-        post("/api/auth/register", null, registerRequest);
-        Long userId = userRepository.findByUsername(username).orElseThrow().getId();
-
-        HttpResponse<String> keyResponse = get("/api/auth/public-key/" + userId, null);
-        assertEquals(200, keyResponse.statusCode());
-        
-        JsonNode keyNode = objectMapper.readTree(keyResponse.body());
-        assertEquals("target-public-key", keyNode.get("publicKey").asText());
+        assertEquals(404, response.statusCode());
     }
 }
