@@ -19,16 +19,19 @@ public class ChatMessageWssIntegrationTest extends BaseWssIntegrationTest {
     @Test
     void shouldSendMessageAndBroadcastToAllChannelMembers() throws Exception {
         // Setup: Three users, one channel, one channel key
-        String token1 = loginAndGetToken("chat_u1", "Password123!");
-        String token2 = loginAndGetToken("chat_u2", "Password123!");
-        String token3 = loginAndGetToken("chat_u3", "Password123!");
+        String username1 = "chat_u1_" + UUID.randomUUID().toString().replace("-", "");
+        String username2 = "chat_u2_" + UUID.randomUUID().toString().replace("-", "");
+        String username3 = "chat_u3_" + UUID.randomUUID().toString().replace("-", "");
+        String token1 = loginAndGetToken(username1, "Password123!");
+        String token2 = loginAndGetToken(username2, "Password123!");
+        String token3 = loginAndGetToken(username3, "Password123!");
 
-        Long userId1 = userRepository.findByUsername("chat_u1").orElseThrow().getId();
-        Long userId2 = userRepository.findByUsername("chat_u2").orElseThrow().getId();
-        Long userId3 = userRepository.findByUsername("chat_u3").orElseThrow().getId();
+        Long userId1 = userRepository.findByUsername(username1).orElseThrow().getId();
+        Long userId2 = userRepository.findByUsername(username2).orElseThrow().getId();
+        Long userId3 = userRepository.findByUsername(username3).orElseThrow().getId();
 
         Channel channel = new Channel();
-        channel.setName("Chat Multi-Point Test");
+        channel.setName("Chat Multi-Point Test " + UUID.randomUUID().toString().replace("-", ""));
         channel.setServerId(1L);
         channel = channelRepository.save(channel);
 
@@ -49,9 +52,9 @@ public class ChatMessageWssIntegrationTest extends BaseWssIntegrationTest {
         TestWebSocketClient client2 = createConnectedClient(token2);
         TestWebSocketClient client3 = createConnectedClient(token3);
 
-        setSessionAttributes("chat_u1", channel.getId(), key.getId());
-        setSessionAttributes("chat_u2", channel.getId(), key.getId());
-        setSessionAttributes("chat_u3", channel.getId(), key.getId());
+        setSessionAttributes(username1, channel.getId(), key.getId());
+        setSessionAttributes(username2, channel.getId(), key.getId());
+        setSessionAttributes(username3, channel.getId(), key.getId());
 
         // Client 1 sends an encrypted message
         byte[] content = "Hello points!".getBytes();

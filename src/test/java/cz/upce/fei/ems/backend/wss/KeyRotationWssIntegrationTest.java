@@ -18,14 +18,16 @@ public class KeyRotationWssIntegrationTest extends BaseWssIntegrationTest {
     @Test
     void shouldRequestKeyRotationAndSolicitAnotherPoint() throws Exception {
         // Setup: Two users, one channel, one channel key
-        String token1 = loginAndGetToken("rot_user1", "Password123!");
-        String token2 = loginAndGetToken("rot_user2", "Password123!");
+        String username1 = "rot_user1_" + UUID.randomUUID().toString().replace("-", "");
+        String username2 = "rot_user2_" + UUID.randomUUID().toString().replace("-", "");
+        String token1 = loginAndGetToken(username1, "Password123!");
+        String token2 = loginAndGetToken(username2, "Password123!");
 
-        Long userId1 = userRepository.findByUsername("rot_user1").orElseThrow().getId();
-        Long userId2 = userRepository.findByUsername("rot_user2").orElseThrow().getId();
+        Long userId1 = userRepository.findByUsername(username1).orElseThrow().getId();
+        Long userId2 = userRepository.findByUsername(username2).orElseThrow().getId();
 
         Channel channel = new Channel();
-        channel.setName("Rotation Point Test");
+        channel.setName("Rotation Point Test " + UUID.randomUUID().toString().replace("-", ""));
         channel.setServerId(1L);
         channel = channelRepository.save(channel);
 
@@ -45,8 +47,8 @@ public class KeyRotationWssIntegrationTest extends BaseWssIntegrationTest {
         TestWebSocketClient client1 = createConnectedClient(token1);
         TestWebSocketClient client2 = createConnectedClient(token2);
 
-        setSessionAttributes("rot_user1", channel.getId(), key.getId());
-        setSessionAttributes("rot_user2", channel.getId(), key.getId());
+        setSessionAttributes(username1, channel.getId(), key.getId());
+        setSessionAttributes(username2, channel.getId(), key.getId());
 
         // Client 1 sends Rotate Key Request
         client1.sendPacket(new Packet(PacketType.ROTATE_KEY.getCode(), new byte[0]));

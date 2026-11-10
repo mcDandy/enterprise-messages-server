@@ -18,16 +18,19 @@ public class UnicastKeyRotationWssIntegrationTest extends BaseWssIntegrationTest
     @Test
     void shouldPropagateUnicastKeyRotationStrictlyPointToPoint() throws Exception {
         // Setup: Three users, one channel, one channel key
-        String token1 = loginAndGetToken("unicast_user1", "Password123!");
-        String token2 = loginAndGetToken("unicast_user2", "Password123!");
-        String token3 = loginAndGetToken("unicast_user3", "Password123!");
+        String username1 = "unicast_user1_" + UUID.randomUUID().toString().replace("-", "");
+        String username2 = "unicast_user2_" + UUID.randomUUID().toString().replace("-", "");
+        String username3 = "unicast_user3_" + UUID.randomUUID().toString().replace("-", "");
+        String token1 = loginAndGetToken(username1, "Password123!");
+        String token2 = loginAndGetToken(username2, "Password123!");
+        String token3 = loginAndGetToken(username3, "Password123!");
 
-        Long userId1 = userRepository.findByUsername("unicast_user1").orElseThrow().getId();
-        Long userId2 = userRepository.findByUsername("unicast_user2").orElseThrow().getId();
-        Long userId3 = userRepository.findByUsername("unicast_user3").orElseThrow().getId();
+        Long userId1 = userRepository.findByUsername(username1).orElseThrow().getId();
+        Long userId2 = userRepository.findByUsername(username2).orElseThrow().getId();
+        Long userId3 = userRepository.findByUsername(username3).orElseThrow().getId();
 
         Channel channel = new Channel();
-        channel.setName("Unicast Strict Test");
+        channel.setName("Unicast Strict Test " + UUID.randomUUID().toString().replace("-", ""));
         channel.setServerId(1L);
         channel = channelRepository.save(channel);
 
