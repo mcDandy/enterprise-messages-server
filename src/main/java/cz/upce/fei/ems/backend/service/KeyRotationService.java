@@ -51,7 +51,7 @@ public class KeyRotationService {
 
             UUID version = createNextChannelKey(channelId);
             Packet packet = createRotationPacket(channelId, version);
-            userQueue.enqueueForUser(recipient.getId(), channelId, encodeFrame(packet));
+            userQueue.enqueueForUser(recipient.getId(), encodeFrame(packet));
             log.info("Queued key rotation for channel {} to user {} (requestId: {})",
                     channelId, recipient.getId(), version);
             if (online != null && online.isOpen()) {
@@ -181,7 +181,7 @@ public class KeyRotationService {
         Packet packet = createUnicastRotationPacket(senderUserId, channelKey, ciphertext);
         // Persist the complete encoded packet *before* dispatching it, whether
         // the recipient is online or offline. Queue insert uses the same DB txn.
-        userQueue.enqueueForUser(recipientUserId, channelId, encodeFrame(packet));
+        userQueue.enqueueForUser(recipientUserId, encodeFrame(packet));
         WebSocketSession session = sessionRegistry.getSession(recipient.getUsername());
         if (session != null && session.isOpen()) {
             Runnable dispatch = () -> {

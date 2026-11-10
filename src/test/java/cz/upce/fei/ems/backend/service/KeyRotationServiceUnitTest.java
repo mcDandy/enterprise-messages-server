@@ -12,7 +12,6 @@ import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,6 +26,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
 class KeyRotationServiceUnitTest {
@@ -66,8 +66,7 @@ class KeyRotationServiceUnitTest {
         keyRotationService.solicitateNewKeyRotation(10L, Set.of("user1"));
 
         verify(channelKeyRepository).save(any(ChannelKey.class));
-        verify(userQueue).enqueueForUser(eq(1L), eq(10L), any(byte[].class));
-        verify(keyDeliveryService).deliverQueuedKeys(1L, "user1", session);
+        verify(userQueue).enqueueForUser(eq(1L), any(byte[].class));
         verify(dispatcher, never()).sendTo(any(), any());
     }
 
@@ -77,7 +76,7 @@ class KeyRotationServiceUnitTest {
         keyRotationService.solicitateNewKeyRotation(10L, Set.of("user1"));
 
         verify(channelKeyRepository).save(any(ChannelKey.class));
-        verify(userQueue).enqueueForUser(eq(1L), eq(10L), any(byte[].class));
+        verify(userQueue).enqueueForUser(eq(1L), any(byte[].class));
         verifyNoInteractions(keyDeliveryService);
         verify(dispatcher, never()).sendTo(any(), any());
     }
@@ -91,9 +90,9 @@ class KeyRotationServiceUnitTest {
         keyRotationService.handleClientUnicastRotation(
                 10L, 1L, "user1", 2L, "cipher".getBytes(StandardCharsets.UTF_8));
 
-        InOrder inOrder = inOrder(userQueue, keyDeliveryService);
-        inOrder.verify(userQueue).enqueueForUser(eq(2L), eq(10L), any(byte[].class));
-        inOrder.verify(keyDeliveryService).deliverQueuedKeys(2L, "user2", session);
+        // The contract is to enqueue even for online recipients. Whether and
+        // when a delivery worker is triggered belongs to the backend layer.
+        verify(userQueue).enqueueForUser(eq(2L), any(byte[].class));
         verify(dispatcher, never()).sendTo(any(), any());
     }
 
@@ -104,9 +103,19 @@ class KeyRotationServiceUnitTest {
         keyRotationService.handleClientUnicastRotation(
                 10L, 1L, "user1", 2L, "cipher".getBytes(StandardCharsets.UTF_8));
 
-        verify(userQueue).enqueueForUser(eq(2L), eq(10L), any(byte[].class));
+        verify(userQueue).enqueueForUser(eq(2L), any(byte[].class));
         verifyNoInteractions(keyDeliveryService);
         verify(dispatcher, never()).sendTo(any(), any());
+    }
+
+    @Test
+    void rejectsUnicastForRecipientOutsideChannelWithoutEnqueuing() {
+        when(channelMemberRepository.existsByChannelIdAndUserId(10L, 1L)).thenReturn(true);
+        when(channelMemberRepository.existsByChannelIdAndUserId(10L, 2L)).thenReturn(false);
+
+        assertThrows(SecurityException.class, () -> keyRotationService.handleClientUnicastRotation(
+                10L, 1L, "user1", 2L, "cipher".getBytes(StandardCharsets.UTF_8)));
+        verifyNoInteractions(userQueue);
     }
 
     private static AppUser user(long id, String username) {

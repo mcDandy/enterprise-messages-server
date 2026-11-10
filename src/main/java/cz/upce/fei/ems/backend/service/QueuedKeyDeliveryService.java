@@ -5,7 +5,6 @@ import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
 import cz.upce.fei.ems.backend.queue.QueuedPacket;
-import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,19 +23,16 @@ public class QueuedKeyDeliveryService {
     private static final int BATCH_SIZE = 100;
 
     private final PostgresUserQueue userQueue;
-    private final ChannelMemberRepository channelMemberRepository;
     private final PacketCodec packetCodec;
     private final PacketDispatcher dispatcher;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void deliverQueuedKeys(long recipientUserId, String username, WebSocketSession session) {
+        // TODO: Authorize channel-scoped frames before sending them.
+        // Removing queue metadata also removed the former membership check here;
+        // a queued key packet can otherwise reach a member removed after enqueue.
         for (QueuedPacket pending : userQueue.claimForUser(
                 recipientUserId, VISIBILITY_SECONDS, BATCH_SIZE)) {
-            if (pending.channelId() != null &&
-                    !channelMemberRepository.existsByChannelIdAndUserId(pending.channelId(), recipientUserId)) {
-                userQueue.acknowledgeForUser(recipientUserId, pending.messageId());
-                continue;
-            }
             if (!session.isOpen()) break;
             try {
                 Packet packet = packetCodec.decode(ByteBuffer.wrap(pending.frame()));

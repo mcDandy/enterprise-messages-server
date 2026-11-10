@@ -61,29 +61,49 @@ class PostgresUserQueueIntegrationTest {
     void isolatesQueuesAndPreservesFramesOfDifferentPacketTypes() {
         long userA = createTestQueue();
         long userB = createTestQueue();
-        long channel = uniquePositiveId();
         byte[] key = frame(PacketType.UNICAST_KEY_ROTATION.getCode(), new byte[]{0, (byte) 0xff, 42});
         byte[] chat = frame(PacketType.CHAT_MESSAGE_ENC.getCode(), new byte[]{12, 24});
-        long idA = queue.enqueueForUser(userA, channel, key);
+        long idA = queue.enqueueForUser(userA, key);
         long idB = queue.enqueueForUser(userB, chat);
         assertEquals(1L, idA);
         assertEquals(1L, idB); // IDs are local to each user's queue.
 
         QueuedPacket receivedA = queue.claimForUser(userA, 30, 10).getFirst();
         assertEquals(idA, receivedA.messageId());
-        assertEquals(Long.valueOf(channel), receivedA.channelId());
         assertArrayEquals(key, receivedA.frame());
+        assertEquals(1L, jdbc.queryForObject(
+                "SELECT count(*) FROM pgmq.\"q_" + PostgresUserQueue.queueName(userA) +
+                        "\" WHERE msg_id = ? AND message = jsonb_build_object('frame', ?) ",
+                Long.class, idA, java.util.Base64.getEncoder().encodeToString(key)));
         assertTrue(queue.claimForUser(userA, 30, 10).isEmpty());
 
         QueuedPacket receivedB = queue.claimForUser(userB, 30, 10).getFirst();
         assertEquals(idB, receivedB.messageId());
-        assertNull(receivedB.channelId());
         assertArrayEquals(chat, receivedB.frame());
         assertTrue(queue.acknowledgeForUser(userA, idA));
         assertTrue(queue.acknowledgeForUser(userB, idB));
         assertFalse(queue.acknowledgeForUser(userA, idA));
         assertTrue(queue.claimForUser(userA, 1, 10).isEmpty());
         assertTrue(queue.claimForUser(userB, 1, 10).isEmpty());
+    }
+
+    @Test
+    void mixesMultiplePacketTypesInTheSameUserQueueWithoutParsingThem() {
+        long user = createTestQueue();
+        byte[] chat = frame(PacketType.CHAT_MESSAGE_ENC.getCode(), new byte[]{1});
+        byte[] rotate = frame(PacketType.ROTATE_KEY.getCode(), new byte[]{2});
+        byte[] unicast = frame(PacketType.UNICAST_KEY_ROTATION.getCode(), new byte[]{3});
+
+        queue.enqueueForUser(user, chat);
+        queue.enqueueForUser(user, rotate);
+        queue.enqueueForUser(user, unicast);
+        List<QueuedPacket> claimed = queue.claimForUser(user, 30, 10);
+
+        assertEquals(3, claimed.size());
+        assertArrayEquals(chat, claimed.get(0).frame());
+        assertArrayEquals(rotate, claimed.get(1).frame());
+        assertArrayEquals(unicast, claimed.get(2).frame());
+        for (QueuedPacket packet : claimed) assertTrue(queue.acknowledgeForUser(user, packet.messageId()));
     }
 
     @Test

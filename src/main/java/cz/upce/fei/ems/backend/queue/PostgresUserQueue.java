@@ -28,20 +28,13 @@ public class PostgresUserQueue {
                 "SELECT pgmq.drop_queue(?)", Boolean.class, queueName(userId)));
     }
 
+    /** Stores the complete opaque WebSocket frame, including its multiplex byte. */
     public long enqueueForUser(long userId, byte[] frame) {
-        return enqueueForUser(userId, null, frame);
-    }
-
-    /**
-     * Channel scope is optional transport metadata used by key-delivery authorization.
-     * The frame remains opaque (including its existing multiplex byte).
-     */
-    public long enqueueForUser(long userId, Long channelId, byte[] frame) {
         if (frame == null || frame.length == 0) throw new IllegalArgumentException("Empty frame");
         Long id = jdbc.queryForObject(
                 "SELECT pgmq.send(?, jsonb_build_object('frame', " +
-                        "encode(CAST(? AS bytea), 'base64'), 'channelId', CAST(? AS bigint)))",
-                Long.class, queueName(userId), frame, channelId);
+                        "encode(CAST(? AS bytea), 'base64')))",
+                Long.class, queueName(userId), frame);
         if (id == null || id <= 0) throw new IllegalStateException("PGMQ did not return a message ID");
         return id;
     }
@@ -50,11 +43,9 @@ public class PostgresUserQueue {
         if (visibilityTimeoutSeconds <= 0 || limit <= 0)
             throw new IllegalArgumentException("Invalid queue claim limit/timeout");
         return jdbc.query(
-                "SELECT msg_id, (message->>'channelId')::bigint AS channel_id, " +
-                        "decode(message->>'frame', 'base64') AS frame " +
+                "SELECT msg_id, decode(message->>'frame', 'base64') AS frame " +
                         "FROM pgmq.read(?, ?, ?)",
-                (rs, index) -> new QueuedPacket(rs.getLong("msg_id"),
-                        rs.getObject("channel_id", Long.class), rs.getBytes("frame")),
+                (rs, index) -> new QueuedPacket(rs.getLong("msg_id"), rs.getBytes("frame")),
                 queueName(userId), visibilityTimeoutSeconds, limit);
     }
 

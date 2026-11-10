@@ -28,6 +28,7 @@ DECLARE
     target_queue text;
     legacy_user_queue record;
     legacy_row record;
+    existing_user_queue record;
     target_has_messages boolean;
     archive_has_messages boolean;
     user_id bigint;
@@ -55,7 +56,7 @@ BEGIN
         END IF;
     END IF;
 
-    -- Migrate an earlier local 006 installation, preserving opaque JSONB frames.
+    -- Migrate an earlier local 006 installation, retaining only the complete frame.
     -- Never discard an archive or mix two non-empty queues without review.
     FOR legacy_user_queue IN
         SELECT queue_name FROM pgmq.meta
@@ -91,7 +92,12 @@ BEGIN
         FOR legacy_row IN EXECUTE format('SELECT message FROM pgmq.%I ORDER BY msg_id',
                                          'q_' || legacy_user_queue.queue_name)
         LOOP
-            PERFORM pgmq.send(target_queue, legacy_row.message);
+            IF legacy_row.message->>'frame' IS NULL THEN
+                RAISE EXCEPTION 'Migration 006 blocked: missing frame in %', legacy_user_queue.queue_name;
+            END IF;
+            PERFORM decode(legacy_row.message->>'frame', 'base64');
+            PERFORM pgmq.send(target_queue,
+                jsonb_build_object('frame', legacy_row.message->>'frame'));
         END LOOP;
         PERFORM pgmq.drop_queue(legacy_user_queue.queue_name);
     END LOOP;
@@ -105,12 +111,11 @@ BEGIN
     END LOOP;
 
     IF has_delivery THEN
-        -- Move complete frames, retaining optional channel authorization metadata.
+        -- Move complete opaque frames. Channel authorization is a backend concern.
         -- Both send and drop happen in this transaction; any failure rolls back.
         FOR old_row IN SELECT message FROM pgmq.q_nnpro_key_delivery ORDER BY msg_id LOOP
             IF old_row.message->>'recipientUserId' IS NULL OR
-                    old_row.message->>'frame' IS NULL OR
-                    old_row.message->>'channelId' IS NULL THEN
+                    old_row.message->>'frame' IS NULL THEN
                 RAISE EXCEPTION 'Migration 006 blocked: malformed legacy delivery packet';
             END IF;
             recipient_id := (old_row.message->>'recipientUserId')::bigint;
@@ -119,11 +124,27 @@ BEGIN
             END IF;
             PERFORM decode(old_row.message->>'frame', 'base64');
             PERFORM pgmq.send('ems_user_' || recipient_id::text,
-                jsonb_build_object('frame', old_row.message->>'frame',
-                                   'channelId', (old_row.message->>'channelId')::bigint));
+                jsonb_build_object('frame', old_row.message->>'frame'));
         END LOOP;
         PERFORM pgmq.drop_queue('nnpro_key_delivery');
         PERFORM pgmq.drop_queue('nnpro_key_rotation');
     END IF;
+
+    -- Earlier deployments of 006 stored optional channelId in JSONB. Strip
+    -- that field from outstanding/archived messages without touching frame,
+    -- message IDs or visibility metadata. Safe when 006 is rerun.
+    FOR existing_user_queue IN
+        SELECT queue_name FROM pgmq.meta
+        WHERE queue_name ~ '^ems_user_[0-9]+$'
+    LOOP
+        IF to_regclass('pgmq.q_' || existing_user_queue.queue_name) IS NOT NULL THEN
+            EXECUTE format('UPDATE pgmq.%I SET message = message - %L WHERE message ? %L',
+                           'q_' || existing_user_queue.queue_name, 'channelId', 'channelId');
+        END IF;
+        IF to_regclass('pgmq.a_' || existing_user_queue.queue_name) IS NOT NULL THEN
+            EXECUTE format('UPDATE pgmq.%I SET message = message - %L WHERE message ? %L',
+                           'a_' || existing_user_queue.queue_name, 'channelId', 'channelId');
+        END IF;
+    END LOOP;
 END $$;
 COMMIT;

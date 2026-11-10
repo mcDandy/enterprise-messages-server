@@ -66,6 +66,9 @@ to `jdbc:postgresql://localhost:55432/nnpro_test`, user `nnpro`, password
 `nnpro_local_test`. Override these with `TEST_DB_URL`, `TEST_DB_USERNAME`, and
 `TEST_DB_PASSWORD` if needed. The test database is separate from the backend's
 `nnpro` database and must only contain disposable test data.
+The migration-006 regression tests also create and delete randomly named databases
+in this disposable PostgreSQL test cluster; the test role must have `CREATEDB`.
+They refuse to run unless the connection targets `nnpro_test`.
 
 The test database uses PostgreSQL 17 + PGMQ. The test migration runner brings
 older schemas up to migration 006; the Gradle suite includes
@@ -204,7 +207,7 @@ It refuses to drop legacy rotation triggers or archived messages if any remain;
 resolve them before upgrading.
 
 `PostgresUserQueue` stores each complete WebSocket frame as Base64 in JSONB,
-with optional channel-scope metadata. The frame's multiplex byte is opaque to
+with no channel-scope metadata. The frame's multiplex byte is opaque to
 PGMQ. Reads are isolated by queue, not JSON filtering. Message IDs are local to
 each user's queue, so acknowledgments require both user ID and message ID.
 

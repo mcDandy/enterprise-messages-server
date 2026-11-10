@@ -18,19 +18,20 @@ class PostgresUserQueueTest {
     void storesCompleteOpaqueFrameInRecipientQueue() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         byte[] frame = {0x0d, 0, 22, (byte) 0xff};
-        when(jdbc.queryForObject(anyString(), eq(Long.class), eq("ems_user_8"), any(byte[].class), eq(2L)))
+        when(jdbc.queryForObject(anyString(), eq(Long.class), eq("ems_user_8"), any(byte[].class)))
                 .thenReturn(41L);
         PostgresUserQueue queue = new PostgresUserQueue(jdbc);
 
-        assertEquals(41L, queue.enqueueForUser(8L, 2L, frame));
-        verify(jdbc).queryForObject(contains("pgmq.send"), eq(Long.class), eq("ems_user_8"),
-                aryEq(frame), eq(2L));
+        assertEquals(41L, queue.enqueueForUser(8L, frame));
+        verify(jdbc).queryForObject(argThat(sql -> sql.contains("pgmq.send") &&
+                        sql.contains("jsonb_build_object('frame'") && !sql.contains("channelId")),
+                eq(Long.class), eq("ems_user_8"), aryEq(frame));
     }
 
     @Test
-    void supportsPacketsWithoutChannelMetadataAndOpaqueMultiplexBytes() {
+    void supportsOpaqueMultiplexBytesWithoutPacketMetadata() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.queryForObject(anyString(), eq(Long.class), eq("ems_user_9"), any(byte[].class), isNull()))
+        when(jdbc.queryForObject(anyString(), eq(Long.class), eq("ems_user_9"), any(byte[].class)))
                 .thenReturn(1L);
         byte[] arbitraryFrame = {(byte) 0xfe, 0x00};
         assertEquals(1L, new PostgresUserQueue(jdbc).enqueueForUser(9L, arbitraryFrame));
