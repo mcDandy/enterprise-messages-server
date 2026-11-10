@@ -1,6 +1,5 @@
 package cz.upce.fei.ems.backend.integration;
 
-import cz.upce.fei.ems.backend.dto.AuthResponseDto;
 import cz.upce.fei.ems.backend.dto.LoginRequestDto;
 import cz.upce.fei.ems.backend.dto.RegisterRequestDto;
 import org.junit.jupiter.api.Test;
@@ -59,9 +58,25 @@ public class AuthRestApiIntegrationTest extends BaseRestApiIntegrationTest {
     }
 
     @Test
+    void registrationEnforcesUsernameAndPasswordLimits() throws Exception {
+        assertEquals(400, register("ab", "password").statusCode());
+        assertEquals(400, register("u".repeat(51), "password").statusCode());
+        assertEquals(400, register("valid_user_" + UUID.randomUUID(), "12345").statusCode());
+        assertEquals(201, register("valid_user_" + UUID.randomUUID(), "123456").statusCode());
+    }
+
+    @Test
     void publicKeyLookupIsNotExposedUnderAuthApi() throws Exception {
         HttpResponse<String> response = get("/api/auth/public-key/1", null);
 
         assertEquals(404, response.statusCode());
+    }
+
+    private HttpResponse<String> register(String username, String password) throws Exception {
+        RegisterRequestDto request = new RegisterRequestDto();
+        request.setUsername(username);
+        request.setPassword(password);
+        request.setPublicKey("test-public-key");
+        return post("/api/auth/register", null, request);
     }
 }
