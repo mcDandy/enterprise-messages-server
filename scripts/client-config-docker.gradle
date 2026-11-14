@@ -1,0 +1,3 @@
+// Minimal standalone Gradle build for the Docker Compose client-config job.
+// Intentionally does not load Spring Boot, Java compilation or server dependencies.
+apply from: '/workspace/gradle/client-config.gradle'
