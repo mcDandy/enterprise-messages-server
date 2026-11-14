@@ -31,6 +31,27 @@ services:
     entrypoint: ["/bin/sh", "/opt/ems/ensure-dev-cert.sh"]
     restart: "no"
 
+  # Export public Android configuration once the certificate is available.
+  # Uses an isolated Gradle project to avoid resolving backend dependencies.
+  client-config:
+    image: gradle:9.0.0-jdk21
+    # Cert directory is read-only. Writes only public files to client-config/.
+    user: "0:0"
+    environment:
+      TLS_HOST: ${TLS_HOST:-localhost}
+      HTTPS_PORT: ${HTTPS_PORT:-8443}
+    volumes:
+      - ./scripts/client-config-docker.sh:/opt/ems/client-config-docker.sh:ro
+      - ./scripts/client-config-docker.gradle:/workspace/build.gradle:ro
+      - ./gradle/client-config.gradle:/workspace/gradle/client-config.gradle:ro
+      - ${TLS_CERTS_DIR:-./certs}:/certs:ro
+      - ./client-config:/client-config
+    entrypoint: ["/bin/sh", "/opt/ems/client-config-docker.sh"]
+    depends_on:
+      cert-init:
+        condition: service_completed_successfully
+    restart: "no"
+
   backend:
     container_name: ${BACKEND_CONTAINER_NAME:-ems-server}
     build:
@@ -64,6 +85,8 @@ services:
       db:
         condition: service_healthy
       cert-init:
+        condition: service_completed_successfully
+      client-config:
         condition: service_completed_successfully
     restart: unless-stopped
 

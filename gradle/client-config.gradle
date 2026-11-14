@@ -1,0 +1,128 @@
+// Creates a public Android connection bundle without Python or OpenSSL.
+// Usage: ./gradlew exportClientConfig
+// Custom paths: -PclientConfigEnv=.env.firma_a -PclientConfigOutput=client-config/firma_a
+import groovy.json.JsonOutput
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.security.MessageDigest
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+
+tasks.register('exportClientConfig') {
+    group = 'distribution'
+    description = 'Export the server URL and public TLS certificate for the Android app.'
+
+    doLast {
+        File envFile = file(project.findProperty('clientConfigEnv') ?: '.env')
+        File outputDir = file(project.findProperty('clientConfigOutput') ?: 'client-config')
+        if (!envFile.isFile()) {
+            throw new GradleException("Missing configuration: ${envFile}. Create .env first.")
+        }
+
+        Map<String, String> env = [:]
+        String contents = envFile.getText('UTF-8').replaceFirst(/^\uFEFF/, '')
+        contents.readLines().eachWithIndex { String rawLine, int index ->
+            String line = rawLine.trim()
+            if (!line || line.startsWith('#')) return
+            if (line.startsWith('export ')) line = line.substring(7).trim()
+            int eq = line.indexOf('=')
+            if (eq < 0) return
+            String key = line.substring(0, eq).trim()
+            if (!(key in ['TLS_HOST', 'HTTPS_PORT', 'TLS_CERTS_DIR'])) return
+            String value = line.substring(eq + 1).trim()
+            if (value.startsWith('"') || value.startsWith("'")) {
+                String quote = value.substring(0, 1)
+                int end = value.indexOf(quote, 1)
+                if (end < 0 || !(value.substring(end + 1).trim() == '' ||
+                        value.substring(end + 1).trim().startsWith('#'))) {
+                    throw new GradleException("Invalid quoted ${key} in ${envFile}:${index + 1}")
+                }
+                value = value.substring(1, end)
+            } else {
+                value = value.replaceFirst(/\s+#.*$/, '').trim()
+            }
+            env[key] = value
+        }
+
+        String host = env.getOrDefault('TLS_HOST', 'localhost')
+        if (!host || host.length() > 253 || host.contains('://') || host.contains(':')) {
+            throw new GradleException('TLS_HOST must be a hostname or IPv4 address, without scheme or port')
+        }
+        boolean ipv4 = host ==~ /[0-9.]+/
+        if (ipv4) {
+            String[] parts = host.split(/\./, -1)
+            if (parts.length != 4 || parts.any { !it.matches(/[0-9]{1,3}/) || Integer.parseInt(it) > 255 }) {
+                throw new GradleException("Invalid IPv4 address in TLS_HOST: ${host}")
+            }
+        } else if (!host.split(/\./, -1).every {
+            it.length() >= 1 && it.length() <= 63 && it ==~ /[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/
+        }) {
+            throw new GradleException("Invalid hostname in TLS_HOST: ${host}")
+        }
+
+        String portText = env.getOrDefault('HTTPS_PORT', '8443')
+        if (!(portText ==~ /[0-9]+/)) throw new GradleException("Invalid HTTPS_PORT: ${portText}")
+        int port
+        try { port = Integer.parseInt(portText) }
+        catch (NumberFormatException ignored) { throw new GradleException("Invalid HTTPS_PORT: ${portText}") }
+        if (port < 1 || port > 65535) throw new GradleException('HTTPS_PORT must be 1–65535')
+
+        File certDir = file(env.getOrDefault('TLS_CERTS_DIR', './certs'))
+        File publicCert = new File(certDir, 'certificate.pem')
+        if (!publicCert.isFile()) {
+            throw new GradleException("Missing public certificate: ${publicCert}. Run cert-init first.")
+        }
+        String pem = publicCert.getText('US-ASCII')
+        if (pem.count('-----BEGIN CERTIFICATE-----') != 1 ||
+                pem.count('-----END CERTIFICATE-----') != 1 ||
+                pem.contains('-----BEGIN PRIVATE KEY-----')) {
+            throw new GradleException('Expected exactly one PEM public certificate in certificate.pem')
+        }
+        X509Certificate cert
+        try {
+            cert = (X509Certificate) CertificateFactory.getInstance('X.509')
+                    .generateCertificate(new ByteArrayInputStream(pem.getBytes(StandardCharsets.US_ASCII)))
+            cert.checkValidity()
+        } catch (Exception ex) {
+            throw new GradleException("Invalid or expired public certificate: ${ex.message}", ex)
+        }
+        // Android verifies Subject Alternative Names, not merely the Common Name.
+        boolean matched = (cert.subjectAlternativeNames ?: []).any { entry ->
+            int kind = (int) entry[0]
+            String name = entry[1].toString()
+            if (ipv4) return kind == 7 && name == host
+            if (kind != 2) return false
+            if (name.equalsIgnoreCase(host)) return true
+            // A wildcard covers exactly one DNS label.
+            if (name.startsWith('*.')) {
+                String suffix = name.substring(1).toLowerCase(Locale.ROOT)
+                String actual = host.toLowerCase(Locale.ROOT)
+                return actual.endsWith(suffix) && actual.substring(0, actual.length() - suffix.length()).indexOf('.') < 0
+            }
+            return false
+        }
+        if (!matched) throw new GradleException("Certificate SAN does not match TLS_HOST=${host}")
+
+        String sha256 = MessageDigest.getInstance('SHA-256').digest(cert.encoded).encodeHex().toString()
+        String origin = "${host}:${port}"
+        Map<String, Object> manifest = [
+                version: 1,
+                host: host,
+                port: port,
+                httpsBaseUrl: "https://${origin}",
+                webSocketUrl: "wss://${origin}/wss",
+                certificateFile: 'server.crt',
+                certificateSha256: sha256
+        ]
+        Files.createDirectories(outputDir.toPath())
+        Files.copy(publicCert.toPath(), new File(outputDir, 'server.crt').toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        new File(outputDir, 'server.json').setText(JsonOutput.prettyPrint(JsonOutput.toJson(manifest)) + '\n', 'UTF-8')
+        logger.lifecycle("Exported ${outputDir}/server.json and server.crt")
+        logger.lifecycle("URL: ${manifest.httpsBaseUrl}  SHA-256: ${sha256}")
+        if (host in ['localhost', '127.0.0.1', '10.0.2.2']) {
+            logger.warn('This address may not be reachable from a physical Android device.')
+        }
+        logger.lifecycle('Distribute this bundle through a trusted channel; it does not establish trust itself.')
+    }
+}
