@@ -7,6 +7,7 @@ set -eu
 printf 'TLS_HOST=%s\nHTTPS_PORT=%s\nTLS_CERTS_DIR=/certs\n' \
   "${TLS_HOST:-localhost}" "${HTTPS_PORT:-8443}" > /tmp/client-config.env
 
-exec gradle --offline --no-daemon --project-dir /workspace exportClientConfig \
+# The Wrapper downloads the project's pinned Gradle version on the first run.
+exec sh /workspace/gradlew --offline --no-daemon --project-dir /workspace exportClientConfig \
   -PclientConfigEnv=/tmp/client-config.env \
   -PclientConfigOutput=/client-config
