@@ -44,7 +44,7 @@ backup
 
 .env
 
-# Local infrastructure secrets (never commit private keys or Firebase credentials)
+# Local infrastructure secrets
 certs/
 *.p12
 *.jks
@@ -53,3 +53,6 @@ firebase-service-account.json
 # Private instance configurations
 .env.*
 !.env.example-old
+
+# Per-installation public Android connection configurations (export, not source)
+/client-config/
