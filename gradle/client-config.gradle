@@ -1,7 +1,6 @@
 // Creates a public Android connection bundle without Python or OpenSSL.
 // Usage: ./gradlew exportClientConfig
 // Custom paths: -PclientConfigEnv=.env.firma_a -PclientConfigOutput=client-config/firma_a
-import groovy.json.JsonOutput
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.security.MessageDigest
@@ -105,21 +104,26 @@ tasks.register('exportClientConfig') {
 
         String sha256 = MessageDigest.getInstance('SHA-256').digest(cert.encoded).encodeHex().toString()
         String origin = "${host}:${port}"
-        Map<String, Object> manifest = [
-                version: 1,
-                host: host,
-                port: port,
-                httpsBaseUrl: "https://${origin}",
-                webSocketUrl: "wss://${origin}/wss",
-                certificateFile: 'server.crt',
-                certificateSha256: sha256
-        ]
-        Files.createDirectories(outputDir.toPath())
-        Files.copy(publicCert.toPath(), new File(outputDir, 'server.crt').toPath(),
+
+        File androidValuesDir = new File(outputDir, 'android/res/values')
+        File androidRawDir = new File(outputDir, 'android/res/raw')
+        Files.createDirectories(androidValuesDir.toPath())
+        Files.createDirectories(androidRawDir.toPath())
+        String androidXml = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<resources>
+    <string name=\"server_host\">${host}</string>
+    <integer name=\"server_port\">${port}</integer>
+    <string name=\"server_https_url\">https://${origin}</string>
+    <string name=\"server_websocket_url\">wss://${origin}/wss</string>
+</resources>
+"""
+        new File(androidValuesDir, 'server_config.xml').setText(androidXml, 'UTF-8')
+        // network_security_config.xml references this as @raw/devserver (debug only).
+        Files.copy(publicCert.toPath(), new File(androidRawDir, 'devserver.crt').toPath(),
                 java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-        new File(outputDir, 'server.json').setText(JsonOutput.prettyPrint(JsonOutput.toJson(manifest)) + '\n', 'UTF-8')
-        logger.lifecycle("Exported ${outputDir}/server.json and server.crt")
-        logger.lifecycle("URL: ${manifest.httpsBaseUrl}  SHA-256: ${sha256}")
+
+        logger.lifecycle("Android resources: ${outputDir}/android/res/values/server_config.xml and android/res/raw/devserver.crt")
+        logger.lifecycle("URL: https://${origin}  SHA-256: ${sha256}")
         if (host in ['localhost', '127.0.0.1', '10.0.2.2']) {
             logger.warn('This address may not be reachable from a physical Android device.')
         }
