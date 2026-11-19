@@ -59,5 +59,32 @@ public class MessageRestApiIntegrationTest extends BaseRestApiIntegrationTest {
         assertTrue(node.isArray());
         assertEquals(1, node.size());
         assertEquals(key.getVersion().toString(), node.get(0).get("keyVersion").asText());
+
+        Message secondMessage = new Message();
+        secondMessage.setChannelId(channelId);
+        secondMessage.setSenderId(userId);
+        secondMessage.setCiphertext("second-ciphertext".getBytes());
+        secondMessage.setChannelKeyId(key.getId());
+        messageRepository.save(secondMessage);
+
+        HttpResponse<String> pageResponse = get(
+                "/api/channels/" + channelId + "/messages?page=0&size=1&sort=id,asc", token);
+        assertEquals(200, pageResponse.statusCode());
+        JsonNode pageNode = objectMapper.readTree(pageResponse.body());
+        assertTrue(pageNode.get("content").isArray());
+        assertEquals(1, pageNode.get("content").size());
+        assertEquals(secondMessage.getId(), pageNode.get("content").get(0).get("id").asLong());
+        assertFalse(pageNode.get("last").asBoolean());
+    }
+
+    @Test
+    void shouldRejectInvalidMessagePaginationParameters() throws Exception {
+        String token = loginAndGetToken("msg_pagination_user", "Password123!");
+        String endpoint = "/api/channels/1/messages";
+
+        assertEquals(400, get(endpoint + "?page=invalid", token).statusCode());
+        assertEquals(400, get(endpoint + "?page=-1", token).statusCode());
+        assertEquals(400, get(endpoint + "?size=0", token).statusCode());
+        assertEquals(400, get(endpoint + "?size=101", token).statusCode());
     }
 }

@@ -197,6 +197,21 @@ JWT signing secret to multiple organizations.
 The server provides the address and TLS endpoint, but configuring the Android
 client's server URL and certificate trust is a separate client-side requirement.
 
+### Message history REST API
+
+`GET /api/channels/{channelId}/messages/recent` returns the latest 50 messages
+as a JSON array. For incremental history loading, use
+`GET /api/channels/{channelId}/messages?page=0&size=50`. `page` is zero-based
+(default `0`); `size` defaults to `50` and must be between `1` and `100`.
+Results are always ordered by message `id` descending, so the newest message
+comes first. Custom sorting is not supported. Invalid page or size values
+return HTTP `400`.
+
+The paginated endpoint returns a Spring Data `Slice`, not a `Page`: its JSON
+includes `content`, `number`, `size`, `numberOfElements`, `first`, and `last`
+(among other slice metadata), but does not calculate or include a total message
+count. Continue requesting pages while `last` is `false`.
+
 ### Chat message packet
 
 Each binary WebSocket frame starts with a 1-byte packet type. For
