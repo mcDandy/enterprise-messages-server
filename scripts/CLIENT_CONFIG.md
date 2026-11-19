@@ -14,6 +14,12 @@ On Linux/macOS use `./gradlew exportClientConfig`. For a named installation:
 .\gradlew.bat exportClientConfig -PclientConfigEnv=.env.firma_a -PclientConfigOutput=client-config/firma_a
 ```
 
-The task creates `server.json` (host, port, HTTPS URL, WSS URL and certificate
-SHA-256 fingerprint) plus `server.crt` (the **public PEM certificate**, never a
-PKCS#12 keystore or a private key). The output directory is ignored by Git.
+The task creates two Android resource files:
+
+- `android/res/values/server_config.xml` – server host, port,
+  HTTPS URL and WSS URL.
+- `android/res/raw/devserver.crt` – the public PEM certificate,
+  never a PKCS#12 keystore or a private key.
+
+Copy the contents of `client-config/android/res/` into
+the Android `app/src/main/res/` directory.
