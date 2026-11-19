@@ -27,8 +27,9 @@ public class SessionRegistry {
     @SuppressWarnings("resource") // The WebSocket handler owns the session lifecycle.
     public void unregisterSession(WebSocketSession session) {
         if (session.getAttributes().get("username") instanceof String username) {
-            activeSessions.remove(username);
-            channelMembers.values().forEach(members -> members.remove(username));
+            if (activeSessions.remove(username, session)) {
+                channelMembers.values().forEach(members -> members.remove(username));
+            }
         }
     }
 
