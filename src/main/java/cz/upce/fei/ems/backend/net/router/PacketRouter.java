@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
+import java.nio.ByteBuffer;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -22,7 +24,7 @@ public class PacketRouter {
         this.handlers = handlerList.stream()
                 .collect(Collectors.toMap(PacketHandler::getSupportedType, Function.identity()));
 
-        log.info("PacketRouter initialized with {} registered handlers: {}",
+        log.debug("PacketRouter initialized with {} registered handlers: {}",
                 handlers.size(), handlers.keySet());
     }
 
@@ -36,21 +38,26 @@ public class PacketRouter {
         byte[] payload = packet.getPayload();
         int payloadSize = payload != null ? payload.length : 0;
         String typeHex = String.format("0x%02X", packet.getType());
+        ByteBuffer frame = ByteBuffer.allocate(Byte.BYTES + payloadSize)
+                .put(packet.getType());
+        if (payloadSize > 0) {
+            frame.put(payload);
+        }
 
-
-        log.info("Incoming packet -> Type: {} (code: {}), Session ID: {}, Payload size: {} bytes",
+        log.debug("Incoming packet -> Type: {} (code: {}), Session ID: {}, Payload size: {} bytes, Frame: {}",
                 PacketType.fromCode(packet.getType()),
                 typeHex,
                 session != null ? session.getId() : "unknown",
-                payloadSize);
+                payloadSize,
+                HexFormat.of().formatHex(frame.array()));
 
         PacketType typeEnum = PacketType.fromCode(packet.getType());
         PacketHandler handler = handlers.get(typeEnum);
 
         if (handler != null && session != null) {
-            log.info("Routing packet type {} to handler class: {}", typeEnum, handler.getClass().getSimpleName());
+            log.debug("Routing packet type {} to handler class: {}", typeEnum, handler.getClass().getSimpleName());
             handler.handle(session, packet);
-            log.info("Packet type {} successfully handled for session ID: {}", typeEnum, session.getId());
+            log.debug("Packet type {} successfully handled for session ID: {}", typeEnum, session.getId());
         } else {
             log.error("Handler not found for this packet type: {} (code: {})", typeEnum, typeHex);
         }

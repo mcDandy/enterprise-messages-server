@@ -29,7 +29,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
 
     @Override
     public void handle(WebSocketSession session, Packet packet) throws Exception {
-        log.info("Handling UNICAST_KEY_ROTATION packet for session ID: {}", session.getId());
+        log.debug("Handling UNICAST_KEY_ROTATION packet for session ID: {}", session.getId());
 
         byte[] payload = packet.getPayload();
         if (!isValidPayload(session, payload)) {
@@ -50,7 +50,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
     }
 
     private void delegateRotation(AuthenticatedSender sender, UnicastRotationRequest request) {
-        log.info(
+        log.debug(
                 "Delegating client unicast rotation: sender '{}' (ID: {}) -> recipient ID {} in channel {}",
                 sender.username(),
                 sender.user().getId(),
@@ -72,7 +72,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
             dispatcher.sendError(session, "Invalid unicast rotation payload.");
             return false;
         }
-        log.info("Payload received successfully, size: {} bytes", payload.length);
+        log.debug("Payload received successfully, size: {} bytes", payload.length);
         return true;
     }
 
@@ -94,7 +94,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
             dispatcher.sendError(session, "Unauthorized connection.");
             return null;
         }
-        log.info("Authenticated sender resolved: {} (ID: {})", username, sender.getId());
+        log.debug("Authenticated sender resolved: {} (ID: {})", username, sender.getId());
         return new AuthenticatedSender(username, sender);
     }
 
@@ -104,7 +104,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
         long channelId = buffer.getLong();
         byte[] ciphertext = new byte[buffer.remaining()];
         buffer.get(ciphertext);
-        log.info(
+        log.debug(
                 "Buffer parsed -> recipientUserId: {}, ciphertext length: {} bytes",
                 recipientUserId,
                 ciphertext.length

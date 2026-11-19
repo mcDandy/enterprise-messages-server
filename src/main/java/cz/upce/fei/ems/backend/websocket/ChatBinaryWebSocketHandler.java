@@ -29,10 +29,10 @@ public class ChatBinaryWebSocketHandler extends BinaryWebSocketHandler {
         ByteBuffer payloadBuffer = message.getPayload();
         int payloadSize = payloadBuffer.remaining();
 
-        log.info("Handling binary message -> Session ID: {}, Payload size: {} bytes", session.getId(), payloadSize);
+        log.debug("Handling binary message -> Session ID: {}, Payload size: {} bytes", session.getId(), payloadSize);
 
         Packet packet = codec.decode(payloadBuffer);
-        log.info("Decoded packet -> Type: 0x{}, Session ID: {}",
+        log.debug("Decoded packet -> Type: 0x{}, Session ID: {}",
                 String.format("%02X", packet.getType()), session.getId()
         );
 
@@ -42,6 +42,6 @@ public class ChatBinaryWebSocketHandler extends BinaryWebSocketHandler {
     @Override
     public void afterConnectionClosed(@NonNull WebSocketSession session, @NonNull CloseStatus status) {
         sessionRegistry.unregisterSession(session);
-        log.info("WebSocket disconnected: {}", session.getId());
+        log.debug("WebSocket disconnected: {}", session.getId());
     }
 }

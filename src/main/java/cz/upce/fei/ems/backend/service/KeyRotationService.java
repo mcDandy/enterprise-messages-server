@@ -52,7 +52,7 @@ public class KeyRotationService {
             UUID version = createNextChannelKey(channelId);
             Packet packet = createRotationPacket(channelId, version);
             userQueue.enqueueForUser(recipient.getId(), encodeFrame(packet));
-            log.info("Queued key rotation for channel {} to user {} (requestId: {})",
+            log.debug("Queued key rotation for channel {} to user {} (requestId: {})",
                     channelId, recipient.getId(), version);
             if (online != null && online.isOpen()) {
                 dispatchAfterCommit(() -> {
@@ -101,7 +101,7 @@ public class KeyRotationService {
 
     @Transactional
     public void handleRotationRequest(Long channelId, String senderUsername) {
-        log.info("Received rotation request from user {} for channel {}", senderUsername, channelId);
+        log.debug("Received rotation request from user {} for channel {}", senderUsername, channelId);
 
         Set<String> otherMembers = findChannelMemberUsernames(channelId).stream()
                 .filter(username -> !username.equals(senderUsername))
@@ -140,7 +140,7 @@ public class KeyRotationService {
     }
 
     private void logUnicastRotationRequest(Long channelId, String senderUsername, Long recipientUserId) {
-        log.info(
+        log.debug(
                 "Handling client unicast rotation for channel {} from user {} to recipient ID {}",
                 channelId,
                 senderUsername,
@@ -156,7 +156,7 @@ public class KeyRotationService {
             log.error("Channel key does not exists");
             return Optional.empty();
         }
-        log.info(
+        log.debug(
                 "User {} distributed new channel key version {} for channel {} (ciphertext size: {} bytes)",
                 senderUsername,
                 channelKey,
@@ -196,7 +196,7 @@ public class KeyRotationService {
             };
             dispatchAfterCommit(dispatch);
         } else {
-            log.info("Recipient user ID {} is offline; complete key packet queued for channel {}.",
+            log.debug("Recipient user ID {} is offline; complete key packet queued for channel {}.",
                     recipientUserId, channelId);
         }
     }
