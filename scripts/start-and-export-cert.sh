@@ -110,8 +110,14 @@ fi
 # --- 1. start (cert-init -> client-config -> backend) -----------------------------------------
 if [[ "$no_start" -eq 1 ]]; then
   echo "--no-start given: expecting a stack that is already running."
-else
-  docker compose --env-file "$env_file" up -d --build
+elif ! docker compose --env-file "$env_file" up -d --build; then
+  echo "docker compose up failed; the one-shot services report why:" >&2
+  for service in cert-init client-config; do
+    echo "--- docker compose logs --tail 40 ${service} ---" >&2
+    docker compose --env-file "$env_file" logs --tail 40 "$service" 2>&1 || true
+  done
+  echo "If the log says 'Certificate SAN does not match TLS_HOST=${host}', re-run with --rotate-cert." >&2
+  exit 1
 fi
 
 # --- 2. wait for HTTPS to answer -------------------------------------------------------------

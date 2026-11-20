@@ -10,11 +10,13 @@
     cannot possibly validate:
 
       1. reads TLS_HOST / HTTPS_PORT / TLS_CERTS_DIR from the installation's .env
-      2. docker compose up -d --build          (cert-init -> client-config -> backend)
-      3. waits for HTTPS_PORT and reads the certificate the server actually offers
-      4. fails when that certificate's SAN does not contain TLS_HOST, because Android
+      2. checks the certificate that is already in TLS_CERTS_DIR against TLS_HOST, so a
+         stale SAN is reported here instead of aborting 'docker compose up' later
+      3. docker compose up -d --build          (cert-init -> client-config -> backend)
+      4. waits for HTTPS_PORT and reads the certificate the server actually offers
+      5. fails when that certificate's SAN does not contain TLS_HOST, because Android
          verifies SANs and connect() would then fail after an otherwise correct setup
-      5. copies client-config/android/res/raw/devserver.crt into the Android client's
+      6. copies client-config/android/res/raw/devserver.crt into the Android client's
          res/raw/, and makes sure debug-overrides trusts @raw/devserver
 
     The certificate is public (never the keystore, never a key). A dev certificate is
@@ -23,7 +25,8 @@
 
     Certificate rotation is deliberately not silent: TLS_HOST only reaches the SAN when
     a NEW certificate is created, and rotating invalidates the old identity. Pass
-    -RotateCert to archive the current certificate and let cert-init issue a new one.
+    -RotateCert to archive the current certificate and let cert-init issue a new one;
+    the rotation happens before the stack is started, so one run is enough.
 
 .EXAMPLE
     .\scripts\start-and-export-cert.ps1 -LanIp 192.168.1.115 -RotateCert
@@ -46,32 +49,168 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Compose and BuildKit report progress on stderr; that must not look like a failure.
+if (Test-Path Variable:PSNativeCommandUseErrorActionPreference) {
+    $PSNativeCommandUseErrorActionPreference = $false
+}
 
 <#
-    Android verifies Subject Alternative Names, never the Common Name. The formatted SAN coming
-    from .NET is localized ("IP adresa=...", "Název DNS=..."), so only the address itself is matched
-    here; exportClientConfig does the authoritative comparison with a real X.509 parser when it
-    writes devserver.crt. A wildcard is included because it covers exactly one DNS label.
+    Android verifies Subject Alternative Names, never the Common Name, so the comparison
+    has to see the real names. X509Extension::Format() cannot be used for it: it is
+    localised ("IP adresa=192.168.1.115" on a Czech Windows), which makes a substring
+    match depend on the display language and even match the wrong address, because
+    "192.168.1.1" is contained in "192.168.1.115". The SAN extension is therefore read
+    from its DER encoding, which is locale-independent. exportClientConfig does the
+    authoritative version of the same check with a real X.509 parser when it writes
+    devserver.crt; failing fast here only keeps 'docker compose up' from failing with
+    the far less helpful "service client-config didn't complete successfully: exit 1".
 #>
-function Test-CertificateCoversHost {
+function Read-DerLength {
     param(
-        [AllowEmptyString()][string]$San,
+        [Parameter(Mandatory)][byte[]]$Bytes,
+        [Parameter(Mandatory)][ref]$Position
+    )
+
+    $first = $Bytes[$Position.Value]
+    $Position.Value++
+    if (($first -band 0x80) -eq 0) { return $first }          # short form: length is the byte
+
+    $length = 0
+    for ($byte = 0; $byte -lt ($first -band 0x7F); $byte++) { # long form: length follows
+        $length = ($length -shl 8) -bor $Bytes[$Position.Value]
+        $Position.Value++
+    }
+    return $length
+}
+
+function Get-CertificateHostNames {
+    param(
+        [Parameter(Mandatory)]
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
+    )
+
+    $names = New-Object System.Collections.Generic.List[string]
+    $extensions = @($Certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.17' })
+    if ($extensions.Count -eq 0) { return ,$names }
+
+    $bytes = $extensions[0].RawData                # GeneralNames ::= SEQUENCE OF GeneralName
+    $position = 0
+    if ($bytes[0] -ne 0x30) { return ,$names }     # not a SEQUENCE: nothing reliable to read
+    $position = 1
+    [void](Read-DerLength -Bytes $bytes -Position ([ref]$position))
+
+    while ($position -lt $bytes.Length) {
+        $tag = $bytes[$position]
+        $position++
+        $length = Read-DerLength -Bytes $bytes -Position ([ref]$position)
+        if ($length -le 0 -or ($position + $length) -gt $bytes.Length) { break }
+
+        $value = New-Object byte[] $length
+        [Array]::Copy($bytes, $position, $value, 0, $length)
+        $position += $length
+
+        if ($tag -eq 0x82) {                                       # [2] dNSName
+            $names.Add([System.Text.Encoding]::ASCII.GetString($value))
+        } elseif ($tag -eq 0x87 -and $value.Length -eq 4) {        # [7] iPAddress (IPv4)
+            $names.Add((New-Object System.Net.IPAddress(,$value)).ToString())
+        }
+    }
+
+    # No leading comma: PowerShell unrolls a returned collection, and ',$names' would hand the
+    # caller one element containing everything instead of the individual names.
+    return $names
+}
+
+function Read-CertificatePem {
+    param([Parameter(Mandatory)][string]$Path)
+
+    # Handing the PEM file to X509Certificate2 directly behaves differently on Windows
+    # PowerShell and PowerShell 7, so the base64 body is decoded and the DER is passed.
+    $match = [regex]::Match((Get-Content -LiteralPath $Path -Raw),
+        '-----BEGIN CERTIFICATE-----\s*(?<body>[A-Za-z0-9+/=\s]+?)-----END CERTIFICATE-----')
+    if (-not $match.Success) { return $null }
+
+    $der = [Convert]::FromBase64String(($match.Groups['body'].Value -replace '\s', ''))
+    return New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(,$der)
+}
+
+function Test-HostCovered {
+    param(
+        [AllowEmptyCollection()][string[]]$Names,
         [AllowEmptyString()][string]$HostName
     )
 
     if (-not $HostName) { return $false }
-    if ($San -like "*$HostName*") { return $true }
+    $target = $HostName.Trim().TrimEnd('.').ToLowerInvariant()
 
-    foreach ($match in [regex]::Matches($San, '\*\.(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}')) {
-        $suffix = $match.Value.Substring(1).ToLowerInvariant()          # ".firma.cz"
-        $actual = $HostName.ToLowerInvariant()
-        $prefix = $actual.Substring(0, $actual.Length - $suffix.Length)
-        if ($actual.EndsWith($suffix) -and -not $prefix.Contains('.')) {
-            return $true
-        }
+    foreach ($name in $Names) {
+        $candidate = ('' + $name).Trim().TrimEnd('.').ToLowerInvariant()
+        if ($candidate -eq $target) { return $true }
+
+        # A wildcard covers exactly one DNS label, so *.firma.cz never matches a.b.firma.cz.
+        if (-not $candidate.StartsWith('*.')) { continue }
+        $suffix = $candidate.Substring(1)                          # ".firma.cz"
+        if (-not $target.EndsWith($suffix)) { continue }
+        $prefix = $target.Substring(0, $target.Length - $suffix.Length)
+        if ($prefix.Length -gt 0 -and -not $prefix.Contains('.')) { return $true }
     }
 
     return $false
+}
+
+function Invoke-Compose {
+    param(
+        [Parameter(Mandatory)][string]$ComposeEnvFile,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    # Compose reports progress (and BuildKit does most of its output) on stderr. Under
+    # $ErrorActionPreference = 'Stop' those lines can become terminating errors as soon as
+    # somebody redirects the script's output, which would skip the $LASTEXITCODE check and
+    # hide the reason. The exit code alone decides here, so stderr is only noise.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        docker compose --env-file $ComposeEnvFile @Arguments 2>&1 | ForEach-Object { Write-Host "$_" }
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
+function Show-ComposeDiagnostics {
+    param([Parameter(Mandatory)][string]$ComposeEnvFile)
+
+    # Both one-shot services abort the whole 'up'; without their log the only clue is
+    # "service client-config didn't complete successfully: exit 1".
+    foreach ($service in 'cert-init', 'client-config') {
+        Write-Host "--- docker compose logs --tail 40 $service ---" -ForegroundColor Yellow
+        [void](Invoke-Compose -ComposeEnvFile $ComposeEnvFile -Arguments @('logs', '--tail', '40', $service))
+    }
+}
+
+function Invoke-CertificateRotation {
+    param(
+        [Parameter(Mandatory)][string]$CertsPath,
+        [Parameter(Mandatory)][string]$TargetHost
+    )
+
+    $archive = Join-Path $CertsPath ('archive/' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    New-Item -ItemType Directory -Force -Path $archive | Out-Null
+
+    $moved = 0
+    foreach ($name in 'keystore.p12', 'certificate.pem') {
+        $item = Join-Path $CertsPath $name
+        if (Test-Path $item -PathType Leaf) {
+            Move-Item -LiteralPath $item -Destination (Join-Path $archive $name)
+            Write-Host "Archived $name to $archive"
+            $moved++
+        }
+    }
+
+    if ($moved -eq 0) {
+        Write-Host "Nothing to rotate under $CertsPath; cert-init will create a certificate for $TargetHost."
+    }
 }
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -81,6 +220,10 @@ try {
     $envPath = if ([System.IO.Path]::IsPathRooted($EnvFile)) { $EnvFile } else { Join-Path $root $EnvFile }
     if (-not (Test-Path $envPath -PathType Leaf)) {
         throw "Missing $envPath. Copy .env.example to .env and fill in the secrets first."
+    }
+
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        throw 'docker is not on PATH; this installation is started through Docker Compose.'
     }
 
     # Same three keys the compose services and exportClientConfig read; anything else in
@@ -119,6 +262,9 @@ try {
 
     $port = if ($config['HTTPS_PORT']) { [int]$config['HTTPS_PORT'] } else { 8443 }
     $certsDir = if ($config['TLS_CERTS_DIR']) { $config['TLS_CERTS_DIR'] } else { './certs' }
+    $certsPath = if ([System.IO.Path]::IsPathRooted($certsDir)) { $certsDir } else { Join-Path $root $certsDir }
+    $publicCertPath = Join-Path $certsPath 'certificate.pem'
+    $keystorePath = Join-Path $certsPath 'keystore.p12'
 
     if ($LanIp) {
         # Compose prefers process variables over the .env file, so this is enough for the
@@ -129,19 +275,59 @@ try {
 
     Write-Host "Installation: $host_`:$port  certificates: $certsDir" -ForegroundColor Cyan
 
-    # --- 1. start (or restart) the stack -------------------------------------------------------
+    # --- 1. what does the certificate that is already on disk cover? --------------------------
+    # cert-init never changes the identity of an existing keystore, so TLS_HOST (and therefore
+    # -LanIp) only reaches the SAN of a certificate that still has to be created. Checking that
+    # here is what turns "copied certs/ from another machine / changed the IP" into an
+    # understandable message instead of a failed image build followed by exit 1.
+    $covered = @()
+    if (Test-Path $publicCertPath -PathType Leaf) {
+        $existing = Read-CertificatePem $publicCertPath
+        if ($existing) {
+            $covered = @(Get-CertificateHostNames -Certificate $existing)
+            # Precomputed: ')' inside a quoted string would end a $( ... ) subexpression early.
+            $coveredText = $covered -join ', '
+            if (Test-HostCovered -Names $covered -HostName $host_) {
+                Write-Host "Existing certificate covers '$host_' (SAN: $coveredText); it will be reused."
+            } elseif (-not $RotateCert) {
+                throw ("The existing certificate in $certsDir covers '$coveredText' and not TLS_HOST='$host_'. " +
+                       "client-config would abort the stack with 'Certificate SAN does not match TLS_HOST=$host_'. " +
+                       "Re-run with -RotateCert to archive it and let cert-init issue a certificate for '$host_' " +
+                       "(the old identity stops working).")
+            } else {
+                Write-Host "Existing certificate covers '$coveredText', not '$host_'; rotating it before the stack starts." -ForegroundColor Yellow
+            }
+        } else {
+            Write-Warning "$publicCertPath holds no PEM certificate; its SAN is only verified against the running server."
+        }
+    } elseif (Test-Path $keystorePath -PathType Leaf) {
+        Write-Warning "$keystorePath exists without certificate.pem; its SAN cannot be read here, so a mismatch can only be reported by client-config."
+    } else {
+        Write-Host "No certificate in $certsDir yet; cert-init will issue one for '$host_'."
+    }
+
+    $rotated = $false
+    if ($RotateCert) {
+        Invoke-CertificateRotation -CertsPath $certsPath -TargetHost $host_
+        $rotated = $true
+    }
+
+    # --- 2. start (or restart) the stack -------------------------------------------------------
     if ($NoStart) {
         Write-Host '-NoStart given: expecting a stack that is already running.'
     } else {
-        docker compose --env-file $EnvFile up -d --build
-        if ($LASTEXITCODE -ne 0) { throw "docker compose up failed with exit code $LASTEXITCODE." }
+        $exitCode = Invoke-Compose -ComposeEnvFile $EnvFile -Arguments @('up', '-d', '--build')
+        if ($exitCode -ne 0) {
+            Show-ComposeDiagnostics -ComposeEnvFile $EnvFile
+            throw "docker compose up failed with exit code $exitCode."
+        }
     }
 
-    # --- 2. wait for the port, then read the certificate the server offers ---------------------
+    # --- 3. wait for the port, then read the certificate the server offers ---------------------
     $probeHost = if ($host_ -in 'localhost', '127.0.0.1') { '127.0.0.1' } else { $host_ }
     $deadline = (Get-Date).AddSeconds($WaitSeconds)
     $served = $null
-    $san = $null
+    $servedNames = @()
 
     while ((Get-Date) -lt $deadline) {
         try {
@@ -155,8 +341,7 @@ try {
             $ssl = New-Object System.Net.Security.SslStream($tcp.GetStream(), $false, $callback)
             $ssl.AuthenticateAsClient($probeHost)
             $served = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($ssl.RemoteCertificate)
-            $sanExt = $served.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.17' }
-            $san = if ($sanExt) { $sanExt.Format($false) } else { '' }
+            $servedNames = @(Get-CertificateHostNames -Certificate $served)
             $ssl.Dispose()
             $tcp.Close()
             break
@@ -171,35 +356,36 @@ try {
     }
 
     Write-Host ("Served certificate: {0}  valid to {1:yyyy-MM-dd}" -f $served.Subject, $served.NotAfter)
-    Write-Host ("SAN: $san")
+    $servedText = $servedNames -join ', '
+    Write-Host "SAN: $servedText"
 
-    if (-not (Test-CertificateCoversHost -San $san -HostName $host_)) {
-        Write-Error "The certificate does not cover TLS_HOST='$host_'. Android will reject the connection even when the certificate is bundled, because it verifies SANs."
+    if (-not (Test-HostCovered -Names $servedNames -HostName $host_)) {
+        # Write-Error would abort under $ErrorActionPreference = 'Stop' and hide every option below.
+        Write-Host "The served certificate does not cover TLS_HOST='$host_'. Android verifies SANs, so it would reject the connection even with this certificate bundled." -ForegroundColor Red
 
-        if ($RotateCert) {
-            $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-            $archive = Join-Path (Join-Path $root $certsDir) "archive/$stamp"
-            New-Item -ItemType Directory -Force -Path $archive | Out-Null
-            foreach ($name in 'keystore.p12', 'certificate.pem') {
-                $item = Join-Path (Join-Path $root $certsDir) $name
-                if (Test-Path $item -PathType Leaf) {
-                    Move-Item -LiteralPath $item -Destination (Join-Path $archive $name)
-                    Write-Host "Archived $name to $archive"
-                }
-            }
-            Write-Host "Re-running cert-init so it issues a certificate for $host_ ..." -ForegroundColor Cyan
-            docker compose --env-file $EnvFile up -d --build
-            if ($LASTEXITCODE -ne 0) { throw "docker compose up failed with exit code $LASTEXITCODE." }
-            docker compose --env-file $EnvFile up -d --force-recreate --no-deps backend
-            throw "Certificate rotated; run this script again to verify the new one."
+        if ($rotated) {
+            throw "The certificate was rotated for this run, yet the server still offers one that covers '$servedText'. Check that TLS_HOST reaches cert-init: docker compose --env-file $EnvFile config"
+        }
+        if ($NoStart) {
+            throw "Re-run without -NoStart and with -RotateCert to archive the current certificate and issue one for '$host_' (the old identity stops working)."
         }
 
-        throw "Re-run with -RotateCert to archive the current certificate and issue one for $host_ (the old identity stops working)."
+        # Only reachable when no certificate.pem existed above (a keystore without its public
+        # certificate): the SAN could not be known before the stack ran.
+        Invoke-CertificateRotation -CertsPath $certsPath -TargetHost $host_
+        Write-Host "Re-running cert-init so it issues a certificate for '$host_' ..." -ForegroundColor Cyan
+        $exitCode = Invoke-Compose -ComposeEnvFile $EnvFile -Arguments @('up', '-d', '--build')
+        if ($exitCode -ne 0) {
+            Show-ComposeDiagnostics -ComposeEnvFile $EnvFile
+            throw "docker compose up failed with exit code $exitCode."
+        }
+        [void](Invoke-Compose -ComposeEnvFile $EnvFile -Arguments @('up', '-d', '--force-recreate', '--no-deps', 'backend'))
+        throw "Certificate rotated; run this script again to verify the new one."
     }
 
     Write-Host "SAN covers TLS_HOST '$host_'." -ForegroundColor Green
 
-    # --- 3. hand the public certificate to the Android client ---------------------------------
+    # --- 4. hand the public certificate to the Android client ---------------------------------
     $exportedCrt = Join-Path $root 'client-config/android/res/raw/devserver.crt'
     $exportedXml = Join-Path $root 'client-config/android/res/values/server_config.xml'
     if (-not (Test-Path $exportedCrt -PathType Leaf)) {

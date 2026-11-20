@@ -48,6 +48,15 @@ out against a running server: Android verifies Subject Alternative Names, and
 `certificate.pem` under `certs/archive/<timestamp>/` and lets `cert-init` issue a
 new one, so the previous identity stops working.
 
+The PowerShell variant reads `TLS_CERTS_DIR/certificate.pem` **before** Docker is
+called and compares its SAN with the address it is about to ask for. A certificate
+that cannot cover it is therefore reported immediately, with the names it does
+cover, instead of surfacing as `service "client-config" didn't complete
+successfully: exit 1` after the image has been built. With `-RotateCert` the old
+key material is archived at that same point, so one run finishes the whole job.
+If Compose still fails, the logs of `cert-init` and `client-config` are printed
+before the script gives up.
+
 What the client still needs is the certificate as a debug-only trust anchor -
 `app/src/main/res/xml/network_security_config.xml` refers to it as
 `@raw/devserver`, and the script adds that line when it copies the file - plus
