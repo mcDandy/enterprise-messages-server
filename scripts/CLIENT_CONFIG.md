@@ -23,3 +23,33 @@ The task creates two Android resource files:
 
 Copy the contents of `client-config/android/res/` into
 the Android `app/src/main/res/` directory.
+
+## Start the server and hand the certificate to the client in one step
+
+`start-and-export-cert` runs those services in order (`cert-init` → `client-config`
+→ `backend`), reads the certificate the server actually offers, and copies
+`devserver.crt` into the Android checkout next to this repository. It never
+rotates a certificate by itself.
+
+```powershell
+.\scripts\start-and-export-cert.ps1 -LanIp 192.168.1.115 -RotateCert
+```
+
+```bash
+bash scripts/start-and-export-cert.sh --lan-ip 192.168.1.115 --rotate-cert
+```
+
+`-LanIp` / `--lan-ip` overrides `TLS_HOST` for that run only; write it into
+`.env` to keep it. Both variants stop and name the reason when the offered
+certificate does not cover `TLS_HOST`, which is exactly what makes a phone time
+out against a running server: Android verifies Subject Alternative Names, and
+`TLS_HOST` only enters the SAN when a new development certificate is created.
+`-RotateCert` / `--rotate-cert` archives the current `keystore.p12` and
+`certificate.pem` under `certs/archive/<timestamp>/` and lets `cert-init` issue a
+new one, so the previous identity stops working.
+
+What the client still needs is the certificate as a debug-only trust anchor -
+`app/src/main/res/xml/network_security_config.xml` refers to it as
+`@raw/devserver`, and the script adds that line when it copies the file - plus
+`ACCESS_LOCAL_NETWORK` on Android 17, without which every connection to a LAN
+address is dropped without an error.
