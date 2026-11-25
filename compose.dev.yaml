@@ -25,6 +25,8 @@ services:
   # an existing database volume. No effect on normal compose.yaml deployments.
   dev-seed:
     image: postgres:17
+    tmpfs:
+      - /var/lib/postgresql/data
     environment:
       PGPASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     volumes:

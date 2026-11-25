@@ -1,6 +1,6 @@
 services:
   db:
-    container_name: ${DB_CONTAINER_NAME:-db}
+    container_name: ${DB_CONTAINER_NAME:-ems-db}
     image: ghcr.io/pgmq/pg17-pgmq:v1.10.0
     environment:
       POSTGRES_DB: nnpro
@@ -97,6 +97,8 @@ services:
   migrate:
     image: postgres:17
     profiles: ["migrate"]
+    tmpfs:
+      - /var/lib/postgresql/data
     environment:
       PGHOST: db
       PGDATABASE: nnpro
@@ -144,6 +146,8 @@ services:
   migrate-test:
     profiles: ["test"]
     image: postgres:17
+    tmpfs:
+      - /var/lib/postgresql/data
     environment:
       PGHOST: db-test
       PGDATABASE: nnpro_test
