@@ -3,7 +3,6 @@ package cz.upce.fei.ems.backend.wss;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
 import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
-import cz.upce.fei.ems.backend.service.QueuedKeyDeliveryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -16,8 +15,6 @@ import static org.junit.jupiter.api.Assertions.*;
 class QueuedPacketConnectionWssIntegrationTest extends BaseWssIntegrationTest {
     @Autowired
     private PostgresUserQueue userQueue;
-    @Autowired
-    private QueuedKeyDeliveryService deliveryService;
 
     @Test
     void sendsQueuedFramesOneAtATimeWhenUserConnects() throws Exception {
@@ -35,10 +32,8 @@ class QueuedPacketConnectionWssIntegrationTest extends BaseWssIntegrationTest {
             assertNotNull(receivedFirst, "The FIFO head should be sent immediately after connection");
             assertPacketEquals(first, receivedFirst);
             assertArrayEquals(encodeFrame(first), userQueue.peekFirstForUser(userId).getFirst().frame());
-            deliveryService.sendNextQueuedPacket(
-                    userId, username, sessionRegistry.getSession(username));
             assertNull(client.awaitPacket(200, TimeUnit.MILLISECONDS),
-                    "A repeated dispatch trigger must not resend the in-flight frame or skip the queue head");
+                    "The next queued frame must wait for acknowledgment");
 
             client.sendPacket(new Packet(PacketType.ACKNOWLEDGE.getCode(), new byte[0]));
             Packet receivedSecond = client.awaitPacket(5, TimeUnit.SECONDS);

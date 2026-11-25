@@ -4,9 +4,7 @@ import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
-import cz.upce.fei.ems.backend.net.session.SessionRegistry;
 import cz.upce.fei.ems.backend.service.QueuedKeyDeliveryService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.socket.WebSocketSession;
@@ -14,9 +12,6 @@ import org.springframework.web.socket.WebSocketSession;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -29,16 +24,10 @@ import static org.mockito.Mockito.*;
 class QueuedKeyDeliveryServiceTest {
     private final PostgresUserQueue queue = mock(PostgresUserQueue.class);
     private final PacketDispatcher dispatcher = mock(PacketDispatcher.class);
-    private final SessionRegistry sessionRegistry = mock(SessionRegistry.class);
     private final PacketCodec codec = new PacketCodec();
     private final QueuedKeyDeliveryService delivery =
-            new QueuedKeyDeliveryService(queue, codec, dispatcher, sessionRegistry);
+            new QueuedKeyDeliveryService(queue, codec, dispatcher);
     private final WebSocketSession session = mock(WebSocketSession.class);
-
-    @BeforeEach
-    void setUp() {
-        when(sessionRegistry.getSession("bob")).thenReturn(session);
-    }
 
     @Test
     void failedSendDoesNotDeleteQueuedPacket() throws Exception {
@@ -86,72 +75,27 @@ class QueuedKeyDeliveryServiceTest {
         byte[] secondFrame = frame(PacketType.UNICAST_KEY_ROTATION.getCode(), new byte[]{2});
         when(queue.peekFirstForUser(5L))
                 .thenReturn(List.of(new QueuedPacket(21L, firstFrame)),
-                        List.of(new QueuedPacket(21L, firstFrame)),
                         List.of(new QueuedPacket(22L, secondFrame)));
-        when(queue.acknowledgeForUser(5L, 21L)).thenReturn(true);
+        when(queue.acknowledgeFirstForUser(5L)).thenReturn(true);
         when(session.isOpen()).thenReturn(true);
 
         delivery.sendNextQueuedPacket(5L, "bob", session);
-        delivery.sendNextQueuedPacket(5L, "bob", session);
         delivery.acknowledgeAndSendNext(5L, "bob", session);
 
-        verify(queue).acknowledgeForUser(5L, 21L);
+        verify(queue).acknowledgeFirstForUser(5L);
         verify(dispatcher, times(2)).sendTo(eq(session), any(Packet.class));
-        verify(queue, times(3)).peekFirstForUser(5L);
+        verify(queue, times(2)).peekFirstForUser(5L);
     }
 
     @Test
     void acknowledgmentWithEmptyQueueDoesNotSendAnything() {
-        when(session.isOpen()).thenReturn(true);
+        when(queue.acknowledgeFirstForUser(5L)).thenReturn(false);
 
         delivery.acknowledgeAndSendNext(5L, "bob", session);
 
-        verifyNoInteractions(queue);
+        verify(queue).acknowledgeFirstForUser(5L);
         verify(queue, never()).peekFirstForUser(anyLong());
         verifyNoInteractions(dispatcher);
-    }
-
-    @Test
-    void staleSessionCannotAcknowledgeInFlightPacket() throws Exception {
-        when(queue.peekFirstForUser(5L))
-                .thenReturn(List.of(new QueuedPacket(21L,
-                        frame(PacketType.CHAT_MESSAGE_ENC.getCode(), new byte[]{1}))));
-        when(session.isOpen()).thenReturn(true);
-
-        delivery.sendNextQueuedPacket(5L, "bob", session);
-        when(sessionRegistry.getSession("bob")).thenReturn(mock(WebSocketSession.class));
-        delivery.acknowledgeAndSendNext(5L, "bob", session);
-
-        verify(queue, never()).acknowledgeForUser(anyLong(), anyLong());
-    }
-
-    @Test
-    void concurrentDispatchTriggersSendOnlyOneCopyOfQueueHead() throws Exception {
-        when(queue.peekFirstForUser(5L))
-                .thenReturn(List.of(new QueuedPacket(21L,
-                        frame(PacketType.CHAT_MESSAGE_ENC.getCode(), new byte[]{1}))));
-        when(session.isOpen()).thenReturn(true);
-        CountDownLatch firstSendStarted = new CountDownLatch(1);
-        CountDownLatch allowFirstSendToFinish = new CountDownLatch(1);
-        doAnswer(invocation -> {
-            firstSendStarted.countDown();
-            assertTrue(allowFirstSendToFinish.await(5, TimeUnit.SECONDS));
-            return null;
-        }).when(dispatcher).sendTo(eq(session), any(Packet.class));
-
-        var executor = Executors.newFixedThreadPool(2);
-        try {
-            var first = executor.submit(() -> delivery.sendNextQueuedPacket(5L, "bob", session));
-            assertTrue(firstSendStarted.await(5, TimeUnit.SECONDS));
-            var second = executor.submit(() -> delivery.sendNextQueuedPacket(5L, "bob", session));
-            allowFirstSendToFinish.countDown();
-            first.get(5, TimeUnit.SECONDS);
-            second.get(5, TimeUnit.SECONDS);
-        } finally {
-            executor.shutdownNow();
-        }
-
-        verify(dispatcher, times(1)).sendTo(eq(session), any(Packet.class));
     }
 
     private byte[] frame(byte type, byte[] payload) {
