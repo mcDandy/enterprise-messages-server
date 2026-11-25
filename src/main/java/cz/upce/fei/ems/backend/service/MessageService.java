@@ -30,6 +30,7 @@ import org.springframework.web.socket.WebSocketSession;
 import java.nio.ByteBuffer;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -121,7 +122,13 @@ public class MessageService {
                 .map(ChannelMember::getUserId)
                 .filter(userId -> !sender.getId().equals(userId))
                 .collect(Collectors.toSet());
-        recipientIds.forEach(userId -> userQueue.enqueueForUser(userId, frame));
+        recipientIds.forEach(userId -> {
+            long queueMessageId = userQueue.enqueueForUser(userId, frame);
+            log.debug(
+                    "Message packet entered user queue: userId={}, messageId={}, frameLength={} bytes, frame(hex)={}",
+                    userId, queueMessageId, frame.length, HexFormat.of().formatHex(frame)
+            );
+        });
 
         List<AppUser> recipients = new ArrayList<>(appUserRepository.findAllById(recipientIds));
         dispatchAfterCommit(recipients);

@@ -51,7 +51,9 @@ public class KeyRotationService {
 
             UUID version = createNextChannelKey(channelId);
             Packet packet = createRotationPacket(channelId, version);
-            userQueue.enqueueForUser(recipient.getId(), encodeFrame(packet));
+            byte[] frame = encodeFrame(packet);
+            long queueMessageId = userQueue.enqueueForUser(recipient.getId(), frame);
+            logQueuedPacket(recipient.getId(), queueMessageId, frame);
             log.debug("Queued key rotation for channel {} to user {} (requestId: {})",
                     channelId, recipient.getId(), version);
             if (online != null && online.isOpen()) {
@@ -183,7 +185,9 @@ public class KeyRotationService {
         Packet packet = createUnicastRotationPacket(senderUserId, channelKey, ciphertext);
         // Persist the complete encoded packet *before* dispatching it, whether
         // the recipient is online or offline. Queue insert uses the same DB txn.
-        userQueue.enqueueForUser(recipientUserId, encodeFrame(packet));
+        byte[] frame = encodeFrame(packet);
+        long queueMessageId = userQueue.enqueueForUser(recipientUserId, frame);
+        logQueuedPacket(recipientUserId, queueMessageId, frame);
         WebSocketSession session = sessionRegistry.getSession(recipient.getUsername());
         if (session != null && session.isOpen()) {
             Runnable dispatch = () -> {
@@ -208,6 +212,11 @@ public class KeyRotationService {
         payload.putLong(channelKey.getVersion().getLeastSignificantBits());
         payload.put(ciphertext);
         return new Packet(PacketType.UNICAST_KEY_ROTATION.getCode(), payload.array());
+    }
+
+    private void logQueuedPacket(long recipientUserId, long queueMessageId, byte[] frame) {
+            log.debug("Key packet entered user queue: userId={}, messageId={}, frameLength={} bytes, frame(hex)={}",
+                    recipientUserId, queueMessageId, frame.length, HexFormat.of().formatHex(frame));
     }
 
     @Transactional

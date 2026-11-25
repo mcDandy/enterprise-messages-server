@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
+import java.util.HexFormat;
 
 @Slf4j
 @Service
@@ -38,6 +39,11 @@ public class QueuedKeyDeliveryService {
         try {
             Packet packet = packetCodec.decode(ByteBuffer.wrap(pending.frame()));
             dispatcher.sendTo(session, packet);
+            log.debug(
+                    "Packet sent from user queue: userId={}, username={}, messageId={}, frameLength={} bytes, frame(hex)={}",
+                    recipientUserId, username, pending.messageId(), pending.frame().length,
+                    HexFormat.of().formatHex(pending.frame())
+            );
         } catch (Exception e) {
             // Leave the row in the queue so a later delivery attempt can retry it.
             log.warn("Could not dispatch queued packet {} to {}", pending.messageId(), username, e);
