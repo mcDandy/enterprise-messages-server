@@ -9,17 +9,22 @@ import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
 import cz.upce.fei.ems.backend.net.session.SessionRegistry;
 import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
+import cz.upce.fei.ems.backend.repository.ChannelRepository;
 import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
@@ -35,8 +40,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MessageService {
 
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final MessageRepository messageRepository;
     private final AppUserRepository appUserRepository;
+    private final ChannelRepository channelRepository;
     private final ChannelKeyRepository channelKeyRepository;
     private final ChannelMemberRepository channelMemberRepository;
     private final PostgresUserQueue userQueue;
@@ -45,13 +53,30 @@ public class MessageService {
     private final QueuedKeyDeliveryService queuedPacketDeliveryService;
 
     public List<MessageResponseDto> getRecentMessages(Long channelId) {
+        requireChannelExists(channelId);
         return messageRepository.findTop50ByChannelIdOrderBySentAtDescIdDesc(channelId).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public Slice<MessageResponseDto> getMessagesPage(Long channelId, Pageable pageable) {
+    public Slice<MessageResponseDto> getMessagesPage(Long channelId, int page, int size) {
+        if (page < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Page index must be zero or greater.");
+        }
+        if (size < 1 || size > MAX_PAGE_SIZE) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Page size must be between 1 and " + MAX_PAGE_SIZE + ".");
+        }
+
+        requireChannelExists(channelId);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         return messageRepository.findByChannelId(channelId, pageable).map(this::toResponse);
+    }
+
+    private void requireChannelExists(Long channelId) {
+        if (!channelRepository.existsById(channelId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Channel not found");
+        }
     }
 
     private MessageResponseDto toResponse(Message message) {

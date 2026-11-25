@@ -8,14 +8,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -24,8 +19,6 @@ import java.util.List;
 @RequiredArgsConstructor
 @Tag(name = "Messages", description = "Message history endpoints")
 public class MessageController {
-
-    private static final int MAX_PAGE_SIZE = 100;
 
     private final MessageService messageService;
 
@@ -55,6 +48,8 @@ public class MessageController {
                     @ApiResponse(responseCode = "200", description = "Page of messages retrieved successfully",
                             content = @Content(schema = @Schema(implementation = MessageResponseDto.class))),
                     @ApiResponse(responseCode = "400", description = "Invalid page or size parameter",
+                            content = @Content),
+                    @ApiResponse(responseCode = "404", description = "Channel not found",
                             content = @Content)
             }
     )
@@ -63,14 +58,6 @@ public class MessageController {
             @PathVariable Long channelId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        if (page < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Page index must be zero or greater.");
-        }
-        if (size < 1 || size > MAX_PAGE_SIZE) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Page size must be between 1 and " + MAX_PAGE_SIZE + ".");
-        }
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        return ResponseEntity.ok(messageService.getMessagesPage(channelId, pageable));
+        return ResponseEntity.ok(messageService.getMessagesPage(channelId, page, size));
     }
 }
