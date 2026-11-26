@@ -84,11 +84,11 @@ class MessageReceiptServiceIntegrationTest {
         assertEquals(m3, getProgress(channelId, readerId,
                 "last_read_message_id"));
 
-        // Only one receipt row for this user and channel.
+        // Only one membership row for this user and channel.
         Long count = jdbc.queryForObject(
                 """
-                SELECT COUNT(*) FROM message_receipt
-                WHERE message_channel_id = ? AND user_id = ?
+                SELECT COUNT(*) FROM message_channel_member
+                WHERE channel_id = ? AND user_id = ?
                 """,
                 Long.class, channelId, readerId);
 
@@ -99,7 +99,7 @@ class MessageReceiptServiceIntegrationTest {
                 () -> receiptService.markAsRead(m3, outsiderName));
 
         Long outsiderCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM message_receipt WHERE user_id = ?",
+                "SELECT COUNT(*) FROM message_channel_member WHERE user_id = ?",
                 Long.class, outsiderId);
 
         assertEquals(0L, outsiderCount);
@@ -121,8 +121,8 @@ class MessageReceiptServiceIntegrationTest {
 
     private Long getProgress(Long channelId, Long userId, String column) {
         return jdbc.queryForObject(
-                "SELECT " + column + " FROM message_receipt " +
-                        "WHERE message_channel_id = ? AND user_id = ?",
+                "SELECT " + column + " FROM message_channel_member " +
+                        "WHERE channel_id = ? AND user_id = ?",
                 Long.class, channelId, userId);
     }
 }

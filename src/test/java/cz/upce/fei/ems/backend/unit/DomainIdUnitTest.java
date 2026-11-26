@@ -1,7 +1,6 @@
 package cz.upce.fei.ems.backend.unit;
 
 import cz.upce.fei.ems.backend.domain.ChannelMemberId;
-import cz.upce.fei.ems.backend.domain.MessageReceiptId;
 import cz.upce.fei.ems.backend.domain.MessageServerMemberId;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -16,15 +15,6 @@ class DomainIdUnitTest {
 
         assertEquals(id1, id2);
         assertNotEquals(id1, id3);
-        assertEquals(id1.hashCode(), id2.hashCode());
-    }
-
-    @Test
-    void testMessageReceiptId() {
-        MessageReceiptId id1 = new MessageReceiptId(10L, 20L);
-        MessageReceiptId id2 = new MessageReceiptId(10L, 20L);
-
-        assertEquals(id1, id2);
         assertEquals(id1.hashCode(), id2.hashCode());
     }
 

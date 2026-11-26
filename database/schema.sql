@@ -40,7 +40,9 @@ CREATE TABLE message_channel_member
 (
 	channel_id bigint NOT NULL,
 	user_id bigint NOT NULL,
-	joined_at timestamp with time zone NOT NULL   DEFAULT CURRENT_TIMESTAMP
+	joined_at timestamp with time zone NOT NULL   DEFAULT CURRENT_TIMESTAMP,
+	last_delivered_message_id bigint NULL,
+	last_read_message_id bigint NULL
 )
 ;
 
@@ -52,15 +54,6 @@ CREATE TABLE message
 	ciphertext bytea NOT NULL,
 	sent_at timestamp with time zone NOT NULL   DEFAULT CURRENT_TIMESTAMP,
 	channel_key_id bigint NOT NULL
-)
-;
-
-CREATE TABLE message_receipt
-(
-    message_channel_id bigint NOT NULL,
-    user_id bigint NOT NULL,
-    last_delivered_message_id bigint NULL,
-    last_read_message_id bigint NULL
 )
 ;
 
@@ -138,11 +131,7 @@ ALTER TABLE message ADD CONSTRAINT "UQ_message_id_channel"
 CREATE INDEX "IX_message_channel_sent_at" ON message (channel_id ASC,sent_at ASC,id ASC)
 ;
 
-ALTER TABLE message_receipt ADD CONSTRAINT "PK_message_receipt"
-    PRIMARY KEY (message_channel_id,user_id)
-;
-
-CREATE INDEX "IX_message_receipt_user_last_read" ON message_receipt (user_id ASC,last_read_message_id ASC)
+CREATE INDEX "IX_channel_member_user_last_read" ON message_channel_member (user_id ASC,last_read_message_id ASC)
 ;
 
 ALTER TABLE message_server ADD CONSTRAINT "PK_message_server"
@@ -197,20 +186,12 @@ ALTER TABLE message ADD CONSTRAINT "FK_message_sender"
 	FOREIGN KEY (sender_id) REFERENCES app_user (id) ON DELETE NO ACTION ON UPDATE NO ACTION
 ;
 
-ALTER TABLE message_receipt ADD CONSTRAINT "FK_message_receipt_channel"
-    FOREIGN KEY (message_channel_id) REFERENCES message_channel (id) ON DELETE CASCADE ON UPDATE NO ACTION
+ALTER TABLE message_channel_member ADD CONSTRAINT "FK_channel_member_delivered_message"
+    FOREIGN KEY (last_delivered_message_id, channel_id) REFERENCES message (id, channel_id)
 ;
 
-ALTER TABLE message_receipt ADD CONSTRAINT "FK_receipt_delivered_message"
-    FOREIGN KEY (last_delivered_message_id, message_channel_id) REFERENCES message (id, channel_id)
-;
-
-ALTER TABLE message_receipt ADD CONSTRAINT "FK_receipt_read_message"
-    FOREIGN KEY (last_read_message_id, message_channel_id) REFERENCES message (id, channel_id)
-;
-
-ALTER TABLE message_receipt ADD CONSTRAINT "FK_message_receipt_user"
-	FOREIGN KEY (user_id) REFERENCES app_user (id) ON DELETE NO ACTION ON UPDATE NO ACTION
+ALTER TABLE message_channel_member ADD CONSTRAINT "FK_channel_member_read_message"
+    FOREIGN KEY (last_read_message_id, channel_id) REFERENCES message (id, channel_id)
 ;
 
 ALTER TABLE server_member ADD CONSTRAINT "FK_server_member_server"

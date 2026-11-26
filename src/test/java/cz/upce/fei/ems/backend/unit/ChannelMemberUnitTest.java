@@ -18,10 +18,16 @@ class ChannelMemberUnitTest {
         member.setChannelId(channelId);
         member.setUserId(userId);
         member.setJoinedAt(now);
+        assertThat(member.getLastDeliveredMessageId()).isNull();
+        assertThat(member.getLastReadMessageId()).isNull();
+        member.setLastDeliveredMessageId(50L);
+        member.setLastReadMessageId(40L);
 
         assertThat(member.getChannelId()).isEqualTo(channelId);
         assertThat(member.getUserId()).isEqualTo(userId);
         assertThat(member.getJoinedAt()).isEqualTo(now);
+        assertThat(member.getLastDeliveredMessageId()).isEqualTo(50L);
+        assertThat(member.getLastReadMessageId()).isEqualTo(40L);
     }
 
     @Test

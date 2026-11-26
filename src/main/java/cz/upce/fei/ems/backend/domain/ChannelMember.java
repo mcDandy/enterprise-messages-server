@@ -26,4 +26,10 @@ public class ChannelMember {
     @CreationTimestamp(source = SourceType.DB)
     @Column(name = "joined_at", nullable = false, updatable = false)
     private OffsetDateTime joinedAt;
+
+    @Column(name = "last_delivered_message_id")
+    private Long lastDeliveredMessageId;
+
+    @Column(name = "last_read_message_id")
+    private Long lastReadMessageId;
 }
