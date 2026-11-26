@@ -18,20 +18,20 @@ class PostgresUserQueueTest {
     void storesCompleteOpaqueFrameInRecipientQueue() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         byte[] frame = {0x0d, 0, 22, (byte) 0xff};
-        when(jdbc.queryForObject(anyString(), eq(Long.class), eq("ems_user_8"), any(byte[].class)))
+        when(jdbc.queryForObject(anyString(), eq(Long.class), eq("ems_user_8"), any(byte[].class), isNull(Long.class)))
                 .thenReturn(41L);
         PostgresUserQueue queue = new PostgresUserQueue(jdbc);
 
         assertEquals(41L, queue.enqueueForUser(8L, frame));
         verify(jdbc).queryForObject(argThat(sql -> sql.contains("pgmq.send") &&
-                        sql.contains("jsonb_build_object('frame'") && !sql.contains("channelId")),
-                eq(Long.class), eq("ems_user_8"), aryEq(frame));
+                        sql.contains("applicationMessageId") && !sql.contains("channelId")),
+                eq(Long.class), eq("ems_user_8"), aryEq(frame), isNull(Long.class));
     }
 
     @Test
     void supportsOpaqueMultiplexBytesWithoutPacketMetadata() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.queryForObject(anyString(), eq(Long.class), eq("ems_user_9"), any(byte[].class)))
+        when(jdbc.queryForObject(anyString(), eq(Long.class), eq("ems_user_9"), any(byte[].class), isNull(Long.class)))
                 .thenReturn(1L);
         byte[] arbitraryFrame = {(byte) 0xfe, 0x00};
         assertEquals(1L, new PostgresUserQueue(jdbc).enqueueForUser(9L, arbitraryFrame));
@@ -57,13 +57,14 @@ class PostgresUserQueueTest {
         PostgresUserQueue queue = new PostgresUserQueue(jdbc);
         when(jdbc.query(contains("ORDER BY msg_id LIMIT 1"), any(org.springframework.jdbc.core.RowMapper.class)))
                 .thenReturn(java.util.List.of(new QueuedPacket(12L, new byte[]{1, 2})));
-        when(jdbc.queryForObject(contains("ORDER BY msg_id LIMIT 1"), eq(Boolean.class), eq("ems_user_8")))
-                .thenReturn(true);
+        when(jdbc.query(contains("FOR UPDATE"), any(org.springframework.jdbc.core.RowMapper.class),
+                eq("ems_user_8"))).thenReturn(java.util.List.of(new QueuedPacket(12L, new byte[]{1, 2})));
 
         assertEquals(12L, queue.peekFirstForUser(8L).getFirst().messageId());
         assertTrue(queue.acknowledgeFirstForUser(8L));
         verify(jdbc).query(contains("FROM pgmq.\"q_ems_user_8\" ORDER BY msg_id LIMIT 1"),
                 any(org.springframework.jdbc.core.RowMapper.class));
-        verify(jdbc).queryForObject(contains("pgmq.delete(?, msg_id)"), eq(Boolean.class), eq("ems_user_8"));
+        verify(jdbc).query(contains("pgmq.delete(?, head.msg_id)"),
+                any(org.springframework.jdbc.core.RowMapper.class), eq("ems_user_8"));
     }
 }

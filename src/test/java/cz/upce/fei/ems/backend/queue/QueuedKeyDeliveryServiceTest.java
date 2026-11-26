@@ -5,6 +5,7 @@ import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
 import cz.upce.fei.ems.backend.service.QueuedKeyDeliveryService;
+import cz.upce.fei.ems.backend.service.ChannelMemberProgressService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.socket.WebSocketSession;
@@ -12,6 +13,7 @@ import org.springframework.web.socket.WebSocketSession;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -24,9 +26,10 @@ import static org.mockito.Mockito.*;
 class QueuedKeyDeliveryServiceTest {
     private final PostgresUserQueue queue = mock(PostgresUserQueue.class);
     private final PacketDispatcher dispatcher = mock(PacketDispatcher.class);
+    private final ChannelMemberProgressService channelMemberProgressService = mock(ChannelMemberProgressService.class);
     private final PacketCodec codec = new PacketCodec();
     private final QueuedKeyDeliveryService delivery =
-            new QueuedKeyDeliveryService(queue, codec, dispatcher);
+            new QueuedKeyDeliveryService(queue, codec, dispatcher, channelMemberProgressService);
     private final WebSocketSession session = mock(WebSocketSession.class);
 
     @Test
@@ -76,13 +79,14 @@ class QueuedKeyDeliveryServiceTest {
         when(queue.peekFirstForUser(5L))
                 .thenReturn(List.of(new QueuedPacket(21L, firstFrame)),
                         List.of(new QueuedPacket(22L, secondFrame)));
-        when(queue.acknowledgeFirstForUser(5L)).thenReturn(true);
+        when(queue.acknowledgeFirstPacketForUser(5L))
+                .thenReturn(Optional.of(new QueuedPacket(21L, firstFrame)));
         when(session.isOpen()).thenReturn(true);
 
         delivery.sendNextQueuedPacket(5L, "bob", session);
         delivery.acknowledgeAndSendNext(5L, "bob", session);
 
-        verify(queue).acknowledgeFirstForUser(5L);
+        verify(queue).acknowledgeFirstPacketForUser(5L);
         verify(dispatcher, times(2)).sendTo(eq(session), any(Packet.class));
         verify(queue, times(2)).peekFirstForUser(5L);
     }
@@ -95,7 +99,8 @@ class QueuedKeyDeliveryServiceTest {
                 .thenReturn(List.of(new QueuedPacket(31L, rotationFrame)),
                         List.of(new QueuedPacket(31L, rotationFrame)),
                         List.of(new QueuedPacket(32L, messageFrame)));
-        when(queue.acknowledgeFirstForUser(5L)).thenReturn(true);
+        when(queue.acknowledgeFirstPacketForUser(5L))
+                .thenReturn(Optional.of(new QueuedPacket(31L, rotationFrame)));
         when(session.isOpen()).thenReturn(true);
 
         // First delivery sends the existing queue head. A message arriving behind
@@ -112,16 +117,16 @@ class QueuedKeyDeliveryServiceTest {
         assertEquals(PacketType.UNICAST_KEY_ROTATION.getCode(), actual.getAllValues().get(1).getType());
         assertEquals(PacketType.CHAT_MESSAGE_ENC.getCode(), actual.getAllValues().get(2).getType());
         assertArrayEquals(new byte[]{1}, actual.getAllValues().get(2).getPayload());
-        verify(queue).acknowledgeFirstForUser(5L);
+        verify(queue).acknowledgeFirstPacketForUser(5L);
     }
 
     @Test
     void acknowledgmentWithEmptyQueueDoesNotSendAnything() {
-        when(queue.acknowledgeFirstForUser(5L)).thenReturn(false);
+        when(queue.acknowledgeFirstPacketForUser(5L)).thenReturn(Optional.empty());
 
         delivery.acknowledgeAndSendNext(5L, "bob", session);
 
-        verify(queue).acknowledgeFirstForUser(5L);
+        verify(queue).acknowledgeFirstPacketForUser(5L);
         verify(queue, never()).peekFirstForUser(anyLong());
         verifyNoInteractions(dispatcher);
     }

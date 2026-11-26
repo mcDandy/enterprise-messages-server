@@ -3,6 +3,7 @@ package cz.upce.fei.ems.backend.service;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketCodec;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
+import cz.upce.fei.ems.backend.net.protocol.PacketType;
 import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
 import cz.upce.fei.ems.backend.queue.QueuedPacket;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class QueuedKeyDeliveryService {
     private final PostgresUserQueue userQueue;
     private final PacketCodec packetCodec;
     private final PacketDispatcher dispatcher;
+    private final ChannelMemberProgressService channelMemberProgressService;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendNextQueuedPacket(long recipientUserId, String username, WebSocketSession session) {
@@ -52,9 +54,26 @@ public class QueuedKeyDeliveryService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void acknowledgeAndSendNext(long recipientUserId, String username, WebSocketSession session) {
-        if (!userQueue.acknowledgeFirstForUser(recipientUserId)) {
+        var acknowledgedPacket = userQueue.acknowledgeFirstPacketForUser(recipientUserId);
+        if (acknowledgedPacket.isEmpty()) {
             log.debug("Ignoring acknowledgment from {} with an empty packet queue", username);
             return;
+        }
+
+        QueuedPacket acknowledged = acknowledgedPacket.get();
+        Packet packet = packetCodec.decode(ByteBuffer.wrap(acknowledged.frame()));
+        if (PacketType.fromCode(packet.getType()) == PacketType.CHAT_MESSAGE_ENC) {
+            if (acknowledged.applicationMessageId() == null) {
+                log.debug("Acknowledged legacy chat packet {} without an application message ID", acknowledged.messageId());
+            } else {
+                boolean updated = channelMemberProgressService.markAsDelivered(
+                        acknowledged.applicationMessageId(), recipientUserId);
+                if (!updated) {
+                    // The member or message may have been deleted while this packet was pending.
+                    log.debug("Could not update delivered progress for queued packet {}: message or membership missing",
+                            acknowledged.messageId());
+                }
+            }
         }
         runAfterCommit(() -> sendNextQueuedPacket(recipientUserId, username, session));
     }

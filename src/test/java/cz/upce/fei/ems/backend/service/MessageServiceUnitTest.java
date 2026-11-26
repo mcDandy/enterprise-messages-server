@@ -80,6 +80,11 @@ class MessageServiceUnitTest {
         recipient.setId(2L);
         recipient.setUsername("recipient");
         when(appUserRepository.findByUsername("sender")).thenReturn(Optional.of(sender));
+        when(messageRepository.saveAndFlush(any(Message.class))).thenAnswer(invocation -> {
+            Message saved = invocation.getArgument(0);
+            saved.setId(55L);
+            return saved;
+        });
         when(channelMemberRepository.findByChannelId(10L))
                 .thenReturn(List.of(senderMembership, recipientMembership));
         when(appUserRepository.findAllById(Set.of(2L))).thenReturn(List.of(recipient));
@@ -97,8 +102,8 @@ class MessageServiceUnitTest {
         ArgumentCaptor<byte[]> queuedFrame = ArgumentCaptor.forClass(byte[].class);
         InOrder saveBeforeQueue = inOrder(messageRepository, userQueue);
         saveBeforeQueue.verify(messageRepository).saveAndFlush(any(Message.class));
-        saveBeforeQueue.verify(userQueue).enqueueForUser(eq(2L), queuedFrame.capture());
-        verify(userQueue, never()).enqueueForUser(eq(sender.getId()), any(byte[].class));
+        saveBeforeQueue.verify(userQueue).enqueueMessageForUser(eq(2L), eq(55L), queuedFrame.capture());
+        verify(userQueue, never()).enqueueMessageForUser(eq(sender.getId()), anyLong(), any(byte[].class));
         verify(queuedPacketDeliveryService).sendNextQueuedPacket(2L, "recipient", recipientSession);
         Packet decoded = packetCodec.decode(java.nio.ByteBuffer.wrap(queuedFrame.getValue()));
         assertEquals(packet.getType(), decoded.getType());

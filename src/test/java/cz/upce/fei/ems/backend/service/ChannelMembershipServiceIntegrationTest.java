@@ -64,14 +64,14 @@ class ChannelMembershipServiceIntegrationTest {
         Long m3 = insertMessage(channelId, senderId, keyId);
 
         // Confirm the newest delivered message.
-        channelMembershipService.markAsDelivered(m3, readerName);
+        channelMembershipService.markAsDelivered(m3, readerId);
 
         // Read an older message.
         channelMembershipService.markAsRead(m2, readerId);
 
         // Late receipts must not move progress backwards.
         channelMembershipService.markAsRead(m1, readerId);
-        channelMembershipService.markAsDelivered(m1, readerName);
+        channelMembershipService.markAsDelivered(m1, readerId);
 
         assertEquals(m3, getProgress(channelId, readerId,
                 "last_delivered_message_id"));

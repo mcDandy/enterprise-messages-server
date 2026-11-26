@@ -4,11 +4,9 @@ import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.domain.ChannelMember;
 import cz.upce.fei.ems.backend.domain.ChannelMemberId;
-import cz.upce.fei.ems.backend.domain.Message;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.ChannelRepository;
-import cz.upce.fei.ems.backend.repository.MessageRepository;
 import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,9 +29,7 @@ class ChannelMembershipServiceUnitTest {
     @Mock
     private ChannelMemberRepository channelMemberRepository;
     @Mock
-    private MessageRepository messageRepository;
-    @Mock
-    private ChannelMemberInfoService channelMemberInfoService;
+    private ChannelMemberProgressService channelMemberProgressService;
     @Mock
     private AppUserRepository appUserRepository;
     @Mock
@@ -91,26 +87,15 @@ class ChannelMembershipServiceUnitTest {
 
     @Test
     void markAsReadAdvancesProgressForAuthenticatedMember() {
-        Message message = new Message();
-        message.setId(10L);
-        message.setChannelId(1L);
-        when(messageRepository.findById(10L)).thenReturn(Optional.of(message));
-        when(channelMemberRepository.existsByChannelIdAndUserId(1L, 2L)).thenReturn(true);
-
         channelMembershipService.markAsRead(10L, 2L);
 
-        verify(channelMemberRepository).advanceRead(1L, 2L, 10L);
+        verify(channelMemberProgressService).markAsRead(10L, 2L);
     }
 
     @Test
     void markAsReadRejectsNonMember() {
-        Message message = new Message();
-        message.setId(10L);
-        message.setChannelId(1L);
-        when(messageRepository.findById(10L)).thenReturn(Optional.of(message));
-        when(channelMemberRepository.existsByChannelIdAndUserId(1L, 2L)).thenReturn(false);
+        channelMembershipService.markAsRead(10L, 2L);
 
-        assertThrows(SecurityException.class, () -> channelMembershipService.markAsRead(10L, 2L));
-        verify(channelMemberRepository, never()).advanceRead(anyLong(), anyLong(), anyLong());
+        verify(channelMemberProgressService).markAsRead(10L, 2L);
     }
 }

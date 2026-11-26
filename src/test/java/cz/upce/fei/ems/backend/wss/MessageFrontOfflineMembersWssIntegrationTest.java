@@ -100,7 +100,7 @@ class MessageFrontOfflineMembersWssIntegrationTest extends BaseWssIntegrationTes
         receiveAndAcknowledgeSingle(clientD, userIds[3], afterFourth);
 
         clientA.sendPacket(new Packet(PacketType.ROTATE_KEY.getCode(), new byte[0]));
-        Packet solicitation = clientD.awaitPacket(5, TimeUnit.SECONDS);
+        Packet solicitation = awaitQueuedPacket(clientD);
         assertNotNull(solicitation, "The newly added online member should receive the rotation solicitation");
         assertEquals(PacketType.ROTATE_KEY.getCode(), solicitation.getType());
         ByteBuffer rotationPayload = ByteBuffer.wrap(solicitation.getPayload());
@@ -118,7 +118,7 @@ class MessageFrontOfflineMembersWssIntegrationTest extends BaseWssIntegrationTes
         clientA.sendPacket(unicastToOfflineC);
         Packet unicastToOnlineD = unicastPacket(userIds[3], channelId, new byte[]{21, 22});
         clientA.sendPacket(unicastToOnlineD);
-        Packet receivedUnicast = clientD.awaitPacket(5, TimeUnit.SECONDS);
+        Packet receivedUnicast = awaitQueuedPacket(clientD);
         assertNotNull(receivedUnicast, "The online recipient should receive its unicast rotation");
         assertUnicastPayload(receivedUnicast, userIds[0], rotatedKey.getVersion(), new byte[]{21, 22});
         acknowledgeAndAwaitEmpty(clientD, userIds[3]);
@@ -145,7 +145,7 @@ class MessageFrontOfflineMembersWssIntegrationTest extends BaseWssIntegrationTes
         receiveAndAcknowledge(clientC, userIds[2], beforeFourth1);
         receiveAndAcknowledge(clientC, userIds[2], beforeFourth2);
         receiveAndAcknowledge(clientC, userIds[2], afterFourth);
-        Packet receivedOfflineUnicast = clientC.awaitPacket(5, TimeUnit.SECONDS);
+        Packet receivedOfflineUnicast = awaitQueuedPacket(clientC);
         assertNotNull(receivedOfflineUnicast, "Offline unicast rotation should be delivered after reconnect");
         assertUnicastPayload(receivedOfflineUnicast, userIds[0], rotatedKey.getVersion(), new byte[]{11, 12, 13});
         acknowledge(clientC, userIds[2]);
@@ -188,10 +188,26 @@ class MessageFrontOfflineMembersWssIntegrationTest extends BaseWssIntegrationTes
     }
 
     private void receiveAndAcknowledge(TestWebSocketClient client, long userId, Packet expected) throws Exception {
-        Packet received = client.awaitPacket(5, TimeUnit.SECONDS);
+        Packet received = awaitQueuedPacket(client);
         assertNotNull(received, "Expected queued packet type " + PacketType.fromCode(expected.getType()));
         assertPacketEquals(expected, received);
         acknowledge(client, userId);
+    }
+
+    private Packet awaitQueuedPacket(TestWebSocketClient client) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            long remaining = deadline - System.nanoTime();
+            Packet packet = client.awaitPacket(remaining, TimeUnit.NANOSECONDS);
+            if (packet == null) return null;
+            if (packet.getType() == PacketType.CHANNEL_MEMBER_INFO.getCode()) {
+                assertEquals(4 * Long.BYTES, packet.getPayload().length,
+                        "Channel member info should contain four long values");
+                continue;
+            }
+            return packet;
+        }
+        return null;
     }
 
     private void receiveAndAcknowledgeSingle(TestWebSocketClient client, long userId, Packet expected)

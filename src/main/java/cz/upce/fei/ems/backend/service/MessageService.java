@@ -123,7 +123,7 @@ public class MessageService {
                 .filter(userId -> !sender.getId().equals(userId))
                 .collect(Collectors.toSet());
         recipientIds.forEach(userId -> {
-            long queueMessageId = userQueue.enqueueForUser(userId, frame);
+            long queueMessageId = userQueue.enqueueMessageForUser(userId, message.getId(), frame);
             log.debug(
                     "Message packet entered user queue: userId={}, messageId={}, frameLength={} bytes, frame(hex)={}",
                     userId, queueMessageId, frame.length, HexFormat.of().formatHex(frame)
