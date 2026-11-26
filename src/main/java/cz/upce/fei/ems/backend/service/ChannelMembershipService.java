@@ -5,6 +5,7 @@ import cz.upce.fei.ems.backend.dto.ChannelMemberResponseDto;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.ChannelRepository;
+import cz.upce.fei.ems.backend.repository.MessageRepository;
 import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,10 +22,38 @@ public class ChannelMembershipService {
 
     private final ChannelRepository channelRepository;
     private final ChannelMemberRepository channelMemberRepository;
+    private final MessageRepository messageRepository;
     private final AppUserRepository appUserRepository;
     private final MessageServerService serverService;
     private final KeyRotationService keyRotationService;
     private final ServerMemberRepository serverMemberRepository;
+
+    @Transactional
+    public void markAsDelivered(Long messageId, String username) {
+        AppUser user = appUserRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + username));
+        ReceiptContext context = validateReceipt(messageId, user.getId());
+        channelMemberRepository.advanceDelivered(context.channelId(), context.userId(), messageId);
+    }
+
+    @Transactional
+    public void markAsRead(Long messageId, Long userId) {
+        ReceiptContext context = validateReceipt(messageId, userId);
+        channelMemberRepository.advanceRead(context.channelId(), context.userId(), messageId);
+    }
+
+    private ReceiptContext validateReceipt(Long messageId, Long userId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Message not found: " + messageId));
+        Long channelId = message.getChannelId();
+        if (!channelMemberRepository.existsByChannelIdAndUserId(channelId, userId)) {
+            throw new SecurityException("User is not a member of this channel.");
+        }
+        return new ReceiptContext(channelId, userId);
+    }
+
+    private record ReceiptContext(Long channelId, Long userId) {
+    }
 
     public List<ChannelMemberResponseDto> getChannelMembers(Long channelId) {
         return channelMemberRepository.findByChannelId(channelId).stream()

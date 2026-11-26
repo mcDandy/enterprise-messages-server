@@ -40,7 +40,7 @@ public class QueuedKeyDeliveryService {
             Packet packet = packetCodec.decode(ByteBuffer.wrap(pending.frame()));
             dispatcher.sendTo(session, packet);
             log.debug(
-                    "Packet sent from user queue: userId={}, username={}, messageId={}, frameLength={} bytes, frame(hex)={}",
+                    "Packet sent from user queue: userId={}, username={}, quemessageId={}, frameLength={} bytes, frame(hex)={}",
                     recipientUserId, username, pending.messageId(), pending.frame().length,
                     HexFormat.of().formatHex(pending.frame())
             );
