@@ -9,6 +9,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Exposes administrator-only operations for globally banning and unbanning users.
+ */
+
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
@@ -16,12 +20,26 @@ public class AdminController {
 
     private final BanService banService;
 
+    /**
+     * Bans the target account globally and disconnects its active WebSocket session.
+     *
+     * @param id account ID to ban
+     * @param admin authenticated main administrator
+     * @return JSON acknowledgement
+     */
     @PostMapping("/{id}/ban")
     public ResponseEntity<ActionResponseDto> banUser(@PathVariable @PositiveId Long id, @AuthenticationPrincipal AppUser admin) {
         banService.banUserGlobally(admin.getId(), id);
         return ResponseEntity.ok(ActionResponseDto.completed());
     }
 
+    /**
+     * Removes the target account’s global ban.
+     *
+     * @param id account ID to unban
+     * @param admin authenticated main administrator
+     * @return JSON acknowledgement
+     */
     @PostMapping("/{id}/unban")
     public ResponseEntity<ActionResponseDto> unbanUser(@PathVariable @PositiveId Long id, @AuthenticationPrincipal AppUser admin) {
         banService.unbanUserGlobally(admin.getId(), id);

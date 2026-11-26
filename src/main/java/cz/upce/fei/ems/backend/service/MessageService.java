@@ -36,6 +36,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Persists encrypted messages and schedules outbound delivery to channel members.
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -53,6 +57,13 @@ public class MessageService {
     private final SessionRegistry sessionRegistry;
     private final QueuedKeyDeliveryService queuedPacketDeliveryService;
 
+    /**
+     * Returns the most recent 50 messages, newest first, with their encryption-key versions.
+     *
+     * @param channelId channel whose history is requested
+     * @return recent message representations
+     * @throws ResponseStatusException with {@code 404 Not Found} if the channel does not exist
+     */
     public List<MessageResponseDto> getRecentMessages(Long channelId) {
         requireChannelExists(channelId);
         return messageRepository.findTop50ByChannelIdOrderBySentAtDescIdDesc(channelId).stream()
@@ -60,6 +71,15 @@ public class MessageService {
                 .toList();
     }
 
+    /**
+     * Returns one bounded history slice ordered by descending message ID.
+     *
+     * @param channelId channel whose history is requested
+     * @param page zero-based page index
+     * @param size requested page size, capped by {@link #MAX_PAGE_SIZE}
+     * @return message slice with a flag indicating whether another slice exists
+     * @throws ResponseStatusException if pagination values are outside supported bounds or the channel is missing
+     */
     public Slice<MessageResponseDto> getMessagesPage(Long channelId, int page, int size) {
         if (page < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Page index must be zero or greater.");
@@ -88,6 +108,17 @@ public class MessageService {
         return MessageResponseDto.fromEntity(message, keyVersion);
     }
 
+    /**
+     * Persists an encrypted message, queues its encoded packet for every other channel member, and
+     * attempts online delivery only after the database transaction commits.
+     *
+     * @param senderUsername authenticated sender
+     * @param channelId destination channel
+     * @param channelKeyId active channel-key row used to encrypt the message, or {@code null} if no key is active
+     * @param ciphertext opaque encrypted message bytes
+     * @param packet complete protocol packet to enqueue and dispatch
+     * @throws IllegalStateException if no active channel key is available
+     */
     @Transactional
     public void processAndQueueMessage(
             String senderUsername,

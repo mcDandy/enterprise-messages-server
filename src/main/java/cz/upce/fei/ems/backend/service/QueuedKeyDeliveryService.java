@@ -18,6 +18,10 @@ import org.springframework.web.socket.WebSocketSession;
 import java.nio.ByteBuffer;
 import java.util.HexFormat;
 
+/**
+ * Sends queued packets and commits queue removal only after acknowledgement.
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -27,6 +31,14 @@ public class QueuedKeyDeliveryService {
     private final PacketDispatcher dispatcher;
     private final ChannelMemberProgressService channelMemberProgressService;
 
+    /**
+     * Sends the current queue head without deleting it; a later client acknowledgement removes it.
+     * A failed send leaves the packet available for retry.
+     *
+     * @param recipientUserId queue owner
+     * @param username recipient name used for diagnostics
+     * @param session active recipient WebSocket session
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendNextQueuedPacket(long recipientUserId, String username, WebSocketSession session) {
         if (session == null || !session.isOpen()) {
@@ -52,6 +64,14 @@ public class QueuedKeyDeliveryService {
         }
     }
 
+    /**
+     * Removes the acknowledged queue head, advances delivered progress for chat messages, then
+     * sends the next queue head after the acknowledgement transaction commits.
+     *
+     * @param recipientUserId queue owner and message recipient
+     * @param username recipient name used for diagnostics
+     * @param session active recipient session for the next packet
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void acknowledgeAndSendNext(long recipientUserId, String username, WebSocketSession session) {
         var acknowledgedPacket = userQueue.acknowledgeFirstPacketForUser(recipientUserId);

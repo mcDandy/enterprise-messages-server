@@ -9,6 +9,10 @@ import lombok.NoArgsConstructor;
 
 import java.time.OffsetDateTime;
 
+/**
+ * API representation of the authenticated user profile.
+ */
+
 @Data
 @Builder
 @AllArgsConstructor

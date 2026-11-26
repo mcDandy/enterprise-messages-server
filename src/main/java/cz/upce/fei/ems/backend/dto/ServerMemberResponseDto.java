@@ -8,6 +8,10 @@ import lombok.Data;
 
 import java.time.OffsetDateTime;
 
+/**
+ * API representation of a server member and assigned role.
+ */
+
 @Data
 @Builder
 @Schema(description = "Detail člena serveru")

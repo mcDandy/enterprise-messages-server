@@ -18,6 +18,10 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 import java.util.List;
 
+/**
+ * Exposes operations for listing and managing channel membership.
+ */
+
 @RestController
 @RequestMapping("/api/channels/{channelId}/members")
 @RequiredArgsConstructor

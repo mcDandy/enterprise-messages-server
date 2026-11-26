@@ -16,6 +16,10 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
 
+/**
+ * Validates and processes encrypted chat packets received over WebSocket.
+ */
+
 @Component
 @RequiredArgsConstructor
 public class ChatMessageHandler implements PacketHandler {

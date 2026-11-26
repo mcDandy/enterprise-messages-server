@@ -17,6 +17,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Exposes the authenticated user profile and public-key operations.
+ */
+
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor

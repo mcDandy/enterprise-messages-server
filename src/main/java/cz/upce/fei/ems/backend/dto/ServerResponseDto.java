@@ -8,6 +8,10 @@ import lombok.Data;
 
 import java.time.OffsetDateTime;
 
+/**
+ * API representation of a message server.
+ */
+
 @Data
 @Builder
 @Schema(description = "Detail serveru")

@@ -12,6 +12,10 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
+/**
+ * Creates and validates signed authentication tokens.
+ */
+
 @Slf4j
 @Service
 public class JwtService {
@@ -26,6 +30,12 @@ public class JwtService {
         return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * Signs a token whose subject is the supplied username and whose lifetime is configured by {@code JWT_EXPIRATION}.
+     *
+     * @param username token subject
+     * @return compact signed JWT
+     */
     public String generateToken(String username) {
         return Jwts.builder()
                 .subject(username)
@@ -35,6 +45,12 @@ public class JwtService {
                 .compact();
     }
 
+    /**
+     * Extracts the subject after verifying the token signature.
+     *
+     * @param token compact JWT to parse
+     * @return token subject, or {@code null} when parsing or signature validation fails
+     */
     public String extractUsername(String token) {
         try {
             return Jwts.parser()
@@ -49,6 +65,7 @@ public class JwtService {
         }
     }
 
+    /** @return whether the token has a valid signature and has not expired */
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
@@ -61,6 +78,7 @@ public class JwtService {
         }
     }
 
+    /** @return whether the token is valid and its subject matches the loaded account */
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
         return username != null && username.equals(userDetails.getUsername()) && validateToken(token);
@@ -70,6 +88,7 @@ public class JwtService {
         return extractExpiration(token).before(new Date());
     }
 
+    /** @return expiration time from the signed token, expressed as epoch milliseconds */
     public long getExpirationTimestamp(String token) {
         return extractExpiration(token).getTime();
     }

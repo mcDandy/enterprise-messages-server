@@ -6,6 +6,10 @@ import jakarta.validation.constraints.Size;
 import cz.upce.fei.ems.backend.validation.constraints.NoControlCharacters;
 import lombok.Data;
 
+/**
+ * Validated request body for changing a server name.
+ */
+
 @Data
 @Schema(description = "Požadavek na úpravu serveru")
 public class UpdateServerRequestDto {

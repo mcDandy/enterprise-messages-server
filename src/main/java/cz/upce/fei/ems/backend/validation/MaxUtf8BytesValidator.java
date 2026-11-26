@@ -6,6 +6,10 @@ import jakarta.validation.ConstraintValidatorContext;
 
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Checks a strings encoded UTF-8 byte length against its configured limit.
+ */
+
 public class MaxUtf8BytesValidator implements ConstraintValidator<MaxUtf8Bytes, String> {
     private int maximum;
 

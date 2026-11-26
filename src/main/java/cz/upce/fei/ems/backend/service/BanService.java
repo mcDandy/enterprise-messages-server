@@ -3,19 +3,29 @@ package cz.upce.fei.ems.backend.service;
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.net.session.SessionRegistry;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
-import cz.upce.fei.ems.backend.repository.ServerMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Applies global bans and disconnects active sessions belonging to banned users.
+ */
 
 @Service
 @RequiredArgsConstructor
 public class BanService {
 
     private final AppUserRepository appUserRepository;
-    private final ServerMemberRepository serverMemberRepository;
     private final SessionRegistry sessionRegistry;
 
+    /**
+     * Globally bans a non-admin account and closes its active WebSocket session.
+     *
+     * @param adminUserId account ID of the acting main administrator
+     * @param targetUserId account ID to ban
+     * @throws SecurityException when the actor is not a main administrator
+     * @throws IllegalStateException when the actor targets themself or another main administrator
+     */
     @Transactional
     public void banUserGlobally(Long adminUserId, Long targetUserId) {
         AppUser admin = appUserRepository.findById(adminUserId)
@@ -42,6 +52,13 @@ public class BanService {
         sessionRegistry.removeAndCloseSession(targetUser.getUsername());
     }
 
+    /**
+     * Clears a global ban after verifying the actor is a main administrator.
+     *
+     * @param adminUserId account ID of the acting main administrator
+     * @param targetUserId account ID to unban
+     * @throws SecurityException when the actor is not a main administrator
+     */
     @Transactional
     public void unbanUserGlobally(Long adminUserId, Long targetUserId) {
         AppUser admin = appUserRepository.findById(adminUserId)

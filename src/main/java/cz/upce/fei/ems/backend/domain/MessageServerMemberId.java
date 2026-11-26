@@ -6,6 +6,10 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+/**
+ * Composite database key identifying a server membership by server and user IDs.
+ */
+
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode

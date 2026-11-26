@@ -12,6 +12,10 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
 
+/**
+ * Handles read receipts and updates the authenticated members read position.
+ */
+
 @Component
 @RequiredArgsConstructor
 public class ReadPacketHandler implements PacketHandler {

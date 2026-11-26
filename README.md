@@ -20,6 +20,15 @@ starts the backend at `https://localhost:8443`. Logs:
 Swagger UI is at `https://localhost:8443/swagger-ui/index.html`; sign in with
 username `swagger` and the `SWAGGER_PASSWORD` value from `.env`.
 
+JavaDoc documents the code (classes and methods), rather than the REST API.
+Generate its browsable HTML pages from the repository root with:
+
+```powershell
+.\gradlew.bat javadoc
+```
+
+Open `build/docs/javadoc/index.html` in a browser.
+
 ## Development mode: hot reload and demo data
 
 Use the same `.env` as for normal Docker startup. To enable Java live reload

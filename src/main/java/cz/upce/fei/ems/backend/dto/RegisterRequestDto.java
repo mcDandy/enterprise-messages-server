@@ -7,6 +7,10 @@ import cz.upce.fei.ems.backend.validation.constraints.MaxUtf8Bytes;
 import cz.upce.fei.ems.backend.validation.constraints.NoControlCharacters;
 import lombok.Data;
 
+/**
+ * Validated user registration details, including the initial public key.
+ */
+
 @Data
 @ValidRegistrationRequest
 public class RegisterRequestDto {

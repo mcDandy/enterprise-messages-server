@@ -18,6 +18,10 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 import java.util.Map;
 import java.net.InetSocketAddress;
 
+/**
+ * Authenticates WebSocket handshakes and associates the session with its user.
+ */
+
 @Component
 @RequiredArgsConstructor
 public class JwtHandshakeInterceptor implements HandshakeInterceptor {

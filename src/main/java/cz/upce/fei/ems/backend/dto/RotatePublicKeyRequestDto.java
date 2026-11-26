@@ -5,6 +5,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+/**
+ * Validated replacement public key submitted by the authenticated user.
+ */
+
 @Data
 @Schema(description = "Rotace E2EE veřejného klíče")
 public class RotatePublicKeyRequestDto {

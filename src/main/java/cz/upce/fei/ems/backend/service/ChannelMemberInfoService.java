@@ -18,6 +18,10 @@ import org.springframework.web.socket.WebSocketSession;
 import java.nio.ByteBuffer;
 import java.util.List;
 
+/**
+ * Builds and delivers channel-member progress packets to online channel members.
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -28,6 +32,12 @@ public class ChannelMemberInfoService {
     private final PacketDispatcher packetDispatcher;
     private final SessionRegistry sessionRegistry;
 
+    /**
+     * Publishes the updated member’s channel ID, user ID, delivered ID, and read ID to online channel members.
+     * Delivery is deferred until the surrounding transaction commits when transaction synchronization is active.
+     *
+     * @param updatedMember persisted membership whose progress should be broadcast
+     */
     public void publishToChannelMembers(ChannelMember updatedMember) {
         List<Long> memberUserIds = userQueueRecipients(updatedMember.getChannelId());
         List<AppUser> members = appUserRepository.findAllById(memberUserIds);

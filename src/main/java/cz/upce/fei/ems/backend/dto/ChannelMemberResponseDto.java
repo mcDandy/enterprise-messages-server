@@ -7,6 +7,10 @@ import lombok.Data;
 
 import java.time.OffsetDateTime;
 
+/**
+ * API representation of a channel member and that members message progress.
+ */
+
 @Data
 @Builder
 @Schema(description = "Detail člena kanálu")

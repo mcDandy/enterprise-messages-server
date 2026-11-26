@@ -6,6 +6,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Database queries for server memberships and role checks.
+ */
+
 public interface ServerMemberRepository extends JpaRepository<MessageServerMember, MessageServerMemberId> {
     List<MessageServerMember> findByUserId(Long userId);
     List<MessageServerMember> findByServerId(Long serverId);

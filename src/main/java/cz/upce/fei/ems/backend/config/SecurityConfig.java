@@ -23,6 +23,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
+/**
+ * Configures stateless API security, JWT authentication, Swagger access, and JSON security errors.
+ */
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {

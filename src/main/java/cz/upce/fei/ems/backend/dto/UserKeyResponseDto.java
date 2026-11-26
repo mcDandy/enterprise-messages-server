@@ -5,6 +5,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Data;
 
+/**
+ * API representation of a user public key.
+ */
+
 @Data
 @Builder
 @Schema(description = "Detail E2EE klíče uživatele")

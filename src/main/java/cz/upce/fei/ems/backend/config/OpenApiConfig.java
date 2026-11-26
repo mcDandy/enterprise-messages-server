@@ -8,6 +8,10 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Defines the OpenAPI metadata shown in the generated API documentation.
+ */
+
 @Configuration
 public class OpenApiConfig {
 

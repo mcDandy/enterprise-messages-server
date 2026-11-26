@@ -10,6 +10,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Validated credentials submitted to the login endpoint.
+ */
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

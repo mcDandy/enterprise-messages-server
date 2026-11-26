@@ -10,6 +10,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/** Limits a string by its UTF-8 byte count rather than its UTF-16 character count. */
 @Documented
 @Constraint(validatedBy = MaxUtf8BytesValidator.class)
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.ANNOTATION_TYPE,

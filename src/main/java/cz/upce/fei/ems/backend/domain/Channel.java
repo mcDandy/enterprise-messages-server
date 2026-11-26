@@ -8,6 +8,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SourceType;
 import java.time.OffsetDateTime;
 
+/**
+ * Persists a named communication channel belonging to a message server.
+ */
+
 @Entity
 @Table(name = "message_channel")
 @Getter

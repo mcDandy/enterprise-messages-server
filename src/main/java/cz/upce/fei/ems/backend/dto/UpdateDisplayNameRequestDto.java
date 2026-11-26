@@ -6,6 +6,10 @@ import jakarta.validation.constraints.Size;
 import cz.upce.fei.ems.backend.validation.constraints.NoControlCharacters;
 import lombok.Data;
 
+/**
+ * Validated request body for changing the authenticated users display name.
+ */
+
 @Data
 @Schema(description = "Změna zobrazovaného jména")
 public class UpdateDisplayNameRequestDto {

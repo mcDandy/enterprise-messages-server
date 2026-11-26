@@ -19,6 +19,10 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 import java.util.List;
 
+/**
+ * Exposes listing and management of members and roles within a server.
+ */
+
 @RestController
 @RequestMapping("/api/servers/{serverId}/members")
 @RequiredArgsConstructor

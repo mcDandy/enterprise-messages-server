@@ -12,6 +12,10 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Dispatches decoded packets to the handler registered for their type.
+ */
+
 @Slf4j
 @Component
 public class PacketRouter {

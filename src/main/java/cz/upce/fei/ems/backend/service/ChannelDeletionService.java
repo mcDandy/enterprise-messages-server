@@ -9,6 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Deletes channel-owned records in dependency order before removing the channel.
+ */
+
 @Service
 @RequiredArgsConstructor
 public class ChannelDeletionService {
@@ -18,6 +22,12 @@ public class ChannelDeletionService {
     private final ChannelRepository channelRepository;
     private final ChannelMemberRepository channelMemberRepository;
 
+    /**
+     * Removes messages, keys, memberships, and finally the channel within one transaction.
+     * Child rows are deleted first to satisfy their foreign-key dependencies.
+     *
+     * @param channel channel entity to remove
+     */
     @Transactional
     public void deleteChannel(Channel channel) {
         Long channelId = channel.getId();

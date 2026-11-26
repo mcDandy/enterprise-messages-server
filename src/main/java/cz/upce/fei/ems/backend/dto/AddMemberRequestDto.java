@@ -6,6 +6,10 @@ import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Request body for adding a user to a server with a selected role.
+ */
+
 @Getter
 @Setter
 public class AddMemberRequestDto {

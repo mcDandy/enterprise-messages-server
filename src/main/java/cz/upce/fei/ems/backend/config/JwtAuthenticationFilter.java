@@ -22,6 +22,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+/**
+ * Authenticates bearer-token requests before they reach protected REST endpoints.
+ */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

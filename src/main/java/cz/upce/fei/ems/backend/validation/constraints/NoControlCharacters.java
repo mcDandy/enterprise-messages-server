@@ -10,6 +10,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/** Rejects control and bidirectional-formatting characters and surrounding whitespace. */
 @Documented
 @Constraint(validatedBy = NoControlCharactersValidator.class)
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.ANNOTATION_TYPE,

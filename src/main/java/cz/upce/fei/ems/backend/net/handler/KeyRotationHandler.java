@@ -8,6 +8,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
+/**
+ * Handles channel-key rotation requests from a channel member.
+ */
+
 @Component
 @RequiredArgsConstructor
 public class KeyRotationHandler implements PacketHandler {

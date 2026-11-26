@@ -4,6 +4,10 @@ import cz.upce.fei.ems.backend.validation.constraints.NoControlCharacters;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
+/**
+ * Rejects control and invisible directional characters in user-supplied text.
+ */
+
 public class NoControlCharactersValidator implements ConstraintValidator<NoControlCharacters, String> {
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {

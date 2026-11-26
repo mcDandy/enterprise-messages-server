@@ -17,6 +17,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Exposes recent and paginated message history for a channel.
+ */
+
 @RestController
 @RequestMapping("/api/channels/{channelId}/messages")
 @RequiredArgsConstructor

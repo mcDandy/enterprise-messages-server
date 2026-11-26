@@ -14,6 +14,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+/**
+ * Applies per-client HTTP rate and concurrency limits before request processing.
+ */
+
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class TrafficLimitFilter extends OncePerRequestFilter {

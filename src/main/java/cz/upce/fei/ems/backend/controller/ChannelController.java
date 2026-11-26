@@ -21,6 +21,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.security.Principal;
 import java.util.List;
 
+/**
+ * Exposes channel listing, lookup, creation, update, and deletion endpoints.
+ */
+
 @RestController
 @RequiredArgsConstructor
 @Tag(name = "Channels", description = "Channel CRUD operations and management")

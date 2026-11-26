@@ -16,6 +16,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Exposes registration, login, and token-refresh endpoints.
+ */
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -24,6 +28,12 @@ public class AuthController {
 
     private final AuthService authService;
 
+    /**
+     * Registers a validated account and returns its initial authentication token.
+     *
+     * @param request validated registration fields
+     * @return authentication response for the new account
+     */
     @Operation(
             summary = "User Registration",
             description = "Registers a new user and stores their public E2EE key.",
@@ -44,6 +54,12 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
     }
 
+    /**
+     * Authenticates credentials and returns a signed access token.
+     *
+     * @param request validated login credentials
+     * @return authentication response for the account
+     */
     @Operation(
             summary = "User Login",
             description = "Returns JWT token.",
@@ -60,6 +76,12 @@ public class AuthController {
         return ResponseEntity.ok(authService.authenticate(request));
     }
 
+    /**
+     * Validates a refresh token and returns a replacement token.
+     *
+     * @param request validated refresh token
+     * @return replacement authentication response
+     */
     @Operation(
             summary = "Refresh JWT Token",
             description = "Exchanges an expired or valid token for a new JWT token.",

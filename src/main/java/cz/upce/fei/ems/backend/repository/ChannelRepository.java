@@ -1,12 +1,15 @@
 package cz.upce.fei.ems.backend.repository;
 
 import cz.upce.fei.ems.backend.domain.Channel;
-import cz.upce.fei.ems.backend.domain.ChannelMember;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+
+/**
+ * Database queries for channels and channel membership lookups.
+ */
 
 public interface ChannelRepository extends JpaRepository<Channel, Long> {
     List<Channel> findByServerIdOrderByNameAsc(Long serverId);

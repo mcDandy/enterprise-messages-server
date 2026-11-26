@@ -3,6 +3,10 @@ package cz.upce.fei.ems.backend.net.protocol;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Defines packet type codes understood by the server protocol.
+ */
+
 @Getter
 @RequiredArgsConstructor
 public enum PacketType {
@@ -17,6 +21,12 @@ public enum PacketType {
 
     private final byte code;
 
+    /**
+     * Resolves a wire code to a known packet type.
+     *
+     * @param code type byte from the frame header
+     * @return the matching type, or {@link #UNKNOWN} for unrecognized codes
+     */
     public static PacketType fromCode(byte code) {
         for (PacketType type : values()) {
             if (type.code == code) {

@@ -17,6 +17,10 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.BinaryWebSocketHandler;
 
+/**
+ * Receives binary WebSocket frames, enforces connection limits, and routes decoded packets.
+ */
+
 @Component
 @RequiredArgsConstructor
 public class PacketWebSocketHandler extends BinaryWebSocketHandler {

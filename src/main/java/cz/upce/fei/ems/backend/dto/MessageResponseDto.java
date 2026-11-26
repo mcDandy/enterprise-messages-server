@@ -8,6 +8,10 @@ import lombok.Data;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * API representation of an encrypted message and its delivery metadata.
+ */
+
 @Data
 @Builder
 @Schema(description = "Detail zprávy")

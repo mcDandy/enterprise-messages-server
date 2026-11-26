@@ -33,25 +33,36 @@ public class TrafficGuard {
         this.maxWebSockets = maxWebSockets;
     }
 
+    /** @return whether this HTTP request passes both global and per-client token buckets */
     public boolean allowHttpRequest(String client) {
         return buckets.allow("http:global", 1_200, 100, 1)
                 && buckets.allow("http:client:" + client, 240, 20, 1);
     }
 
+    /** @return whether this client may attempt another WebSocket handshake */
     public boolean allowWebSocketHandshake(String client) {
         return buckets.allow("ws:handshake:" + client, 30, 2, 1);
     }
 
+    /** @return whether this WebSocket message passes global and per-client rate limits */
     public boolean allowWebSocketMessage(String client) {
         return buckets.allow("ws:global", 2_000, 1_000, 1)
                 && buckets.allow("ws:client:" + client, 240, 20, 1);
     }
 
+    /** Attempts to reserve an in-flight HTTP request slot without blocking. */
     public boolean tryEnterHttp() { return httpConcurrency.tryAcquire(); }
+
+    /** Releases a slot previously acquired with {@link #tryEnterHttp()}. */
     public void leaveHttp() { httpConcurrency.release(); }
+
+    /** Attempts to reserve a WebSocket message-processing slot without blocking. */
     public boolean tryEnterWebSocketWork() { return websocketWorkConcurrency.tryAcquire(); }
+
+    /** Releases a slot previously acquired with {@link #tryEnterWebSocketWork()}. */
     public void leaveWebSocketWork() { websocketWorkConcurrency.release(); }
 
+    /** Atomically reserves one active WebSocket connection if the configured cap allows it. */
     public boolean tryOpenWebSocket() {
         while (true) {
             int current = activeWebSockets.get();
@@ -60,6 +71,7 @@ public class TrafficGuard {
         }
     }
 
+    /** Releases one active WebSocket connection permit without allowing the count below zero. */
     public void closeWebSocket() { activeWebSockets.updateAndGet(current -> Math.max(0, current - 1)); }
 
     private static final class TokenBuckets {

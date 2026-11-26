@@ -5,6 +5,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+/**
+ * Validated request body for changing a server member role.
+ */
+
 @Data
 @Schema(description = "Požadavek na změnu role člena serveru")
 public class UpdateMemberRoleRequestDto {

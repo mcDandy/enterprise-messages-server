@@ -4,6 +4,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+/**
+ * Validated refresh token submitted to obtain a replacement authentication token.
+ */
+
 @Data
 public class RefreshTokenRequestDto {
 

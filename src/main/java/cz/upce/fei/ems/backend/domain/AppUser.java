@@ -14,6 +14,10 @@ import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Persists an application account and supplies the Spring Security user identity.
+ */
+
 @Entity
 @Table(name = "app_user")
 @Getter

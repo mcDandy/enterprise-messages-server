@@ -8,6 +8,10 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Database queries for active and versioned channel keys.
+ */
+
 public interface ChannelKeyRepository extends JpaRepository<ChannelKey, Long> {
     Optional<ChannelKey> findByChannelIdAndInvalidatedAtIsNull(Long channelId);
     Optional<ChannelKey> findByChannelIdAndVersion(Long channelId, UUID version);

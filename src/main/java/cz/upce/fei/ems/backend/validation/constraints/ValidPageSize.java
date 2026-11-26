@@ -11,6 +11,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/** Restricts a page size to the inclusive range from 1 through 100. */
 @Documented
 @Min(value = 1, message = "Page size must be at least 1")
 @Max(value = 100, message = "Page size must not exceed 100")

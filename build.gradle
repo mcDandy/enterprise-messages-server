@@ -62,3 +62,7 @@ tasks.named('test') {
 	useJUnitPlatform()
 	environment 'SWAGGER_PASSWORD', 'test-swagger-password'
 }
+
+tasks.withType(Javadoc).configureEach {
+	options.addBooleanOption('Xdoclint:-missing', true)
+}

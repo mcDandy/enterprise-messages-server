@@ -21,6 +21,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.security.Principal;
 import java.util.List;
 
+/**
+ * Exposes message-server listing and CRUD endpoints for the authenticated user.
+ */
+
 @RestController
 @RequestMapping("/api/servers")
 @RequiredArgsConstructor

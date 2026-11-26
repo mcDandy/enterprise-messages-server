@@ -29,6 +29,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Maps application, validation, and Spring MVC exceptions to consistent problem-detail responses.
+ */
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private final ApiErrorWriter errors;

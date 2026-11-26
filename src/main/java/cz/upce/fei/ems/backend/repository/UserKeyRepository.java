@@ -5,6 +5,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Database queries for current and historical user public keys.
+ */
+
 public interface UserKeyRepository extends JpaRepository<UserKey, Long> {
     Optional<UserKey> findByUserIdAndRevokedAtIsNull(Long userId);
     Optional<UserKey> findByUserIdInAndRevokedAtIsNull(List<Long> userId);

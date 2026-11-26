@@ -8,6 +8,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SourceType;
 import java.time.OffsetDateTime;
 
+/**
+ * Persists a user public key together with its creation and revocation state.
+ */
+
 @Entity
 @Table(name = "user_key")
 @Getter

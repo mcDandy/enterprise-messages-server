@@ -7,6 +7,10 @@ import lombok.Data;
 
 import java.time.OffsetDateTime;
 
+/**
+ * API representation of a channel.
+ */
+
 @Data
 @Builder
 @Schema(description = "Detail komunikačního kanálu")

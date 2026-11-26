@@ -15,23 +15,31 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
 
+/**
+ * Creates RFC 9457 problem details and writes JSON error responses for servlet-level failures.
+ */
+
 @Component
 public class ApiErrorWriter {
     private static final Logger log = LoggerFactory.getLogger(ApiErrorWriter.class);
     private final ObjectMapper objectMapper;
 
+    /** Creates a writer using the application-configured JSON mapper. */
     public ApiErrorWriter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
+    /** Builds a problem detail without exposing an underlying exception. */
     public ProblemDetail create(HttpStatusCode status, String detail, String path) {
         return create(status, detail, path, Map.of(), null);
     }
 
+    /** Builds a problem detail and logs the cause when the status is a server error. */
     public ProblemDetail create(HttpStatusCode status, String detail, String path, Throwable cause) {
         return create(status, detail, path, Map.of(), cause);
     }
 
+    /** Builds a problem detail with additional extension properties. */
     public ProblemDetail create(HttpStatusCode status, String detail, String path,
                                 Map<String, ?> properties) {
         return create(status, detail, path, properties, null);
@@ -59,6 +67,7 @@ public class ApiErrorWriter {
         return problem;
     }
 
+    /** Writes a JSON error directly to the servlet response unless it has already been committed. */
     public void write(HttpServletRequest request, HttpServletResponse response,
                       HttpStatus status, String message) throws IOException {
         if (response.isCommitted()) return;

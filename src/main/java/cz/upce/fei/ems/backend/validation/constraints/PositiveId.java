@@ -10,6 +10,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/** Requires an identifier to be a strictly positive integer. */
 @Documented
 @Positive(message = "ID must be positive")
 @Constraint(validatedBy = {})

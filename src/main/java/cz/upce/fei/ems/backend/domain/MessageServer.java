@@ -8,6 +8,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SourceType;
 import java.time.OffsetDateTime;
 
+/**
+ * Persists a server that groups channels and has an organization or direct type.
+ */
+
 @Entity
 @Table(name = "message_server")
 @Getter

@@ -9,6 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Advances delivered and read message positions for channel memberships.
+ */
+
 @Service
 @RequiredArgsConstructor
 public class ChannelMemberProgressService {
@@ -17,6 +21,15 @@ public class ChannelMemberProgressService {
     private final ChannelMemberRepository channelMemberRepository;
     private final ChannelMemberInfoService channelMemberInfoService;
 
+    /**
+     * Advances a member’s delivered position when the queue acknowledges a chat packet.
+     * The database update is monotonic, so stale or duplicate acknowledgements do not move it backwards.
+     *
+     * @param messageId application message ID associated with the acknowledged queue item
+     * @param userId recipient account ID
+     * @return {@code true} if a membership progress row was advanced; {@code false} if the message,
+     *         membership, or a newer delivered position makes the update inapplicable
+     */
     @Transactional
     public boolean markAsDelivered(Long messageId, Long userId) {
         Message message = messageRepository.findById(messageId).orElse(null);
@@ -35,6 +48,14 @@ public class ChannelMemberProgressService {
         return true;
     }
 
+    /**
+     * Advances a member’s read position and schedules a progress packet after the transaction commits.
+     *
+     * @param messageId ID of the message the member has read
+     * @param userId authenticated reader account ID
+     * @throws IllegalArgumentException when the message does not exist
+     * @throws SecurityException when the user is not a member of the message’s channel
+     */
     @Transactional
     public void markAsRead(Long messageId, Long userId) {
         Message message = messageRepository.findById(messageId)

@@ -9,6 +9,10 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * Request body containing channel-key updates for a batch of recipients.
+ */
+
 @Data
 @Schema(description = "Požadavek na dávkové načtení klíčů")
 public class BatchKeysRequestDto {

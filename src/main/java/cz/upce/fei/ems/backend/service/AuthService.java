@@ -18,6 +18,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Implements account registration, password authentication, and refresh-token issuance.
+ */
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -28,6 +32,13 @@ public class AuthService {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
 
+    /**
+     * Creates the account and initial public key in one transaction, then issues an access token.
+     *
+     * @param request validated registration data
+     * @return the new account name and token metadata
+     * @throws ResponseStatusException with {@code 409 Conflict} when the username is already taken
+     */
     @Transactional
     public AuthResponseDto register(RegisterRequestDto request) {
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
@@ -53,6 +64,14 @@ public class AuthService {
         return AuthResponseDto.fromToken(token, user.getUsername(), jwtService.getExpirationTimestamp(token));
     }
 
+    /**
+     * Verifies credentials and refuses authentication for globally banned accounts.
+     *
+     * @param request validated login credentials
+     * @return a newly issued access token and its metadata
+     * @throws ResponseStatusException when the account does not exist or the password is incorrect
+     * @throws SecurityException when the account is banned
+     */
     public AuthResponseDto authenticate(LoginRequestDto request) {
         AppUser user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new ResponseStatusException(
@@ -75,6 +94,13 @@ public class AuthService {
         return AuthResponseDto.fromToken(token, user.getUsername(), jwtService.getExpirationTimestamp(token));
     }
 
+    /**
+     * Validates a refresh token against the current user state and issues a replacement token.
+     *
+     * @param request validated refresh-token request
+     * @return replacement token and expiration metadata
+     * @throws ResponseStatusException when the token is invalid, expired, or belongs to no account
+     */
     public AuthResponseDto refreshToken(RefreshTokenRequestDto request) {
         String token = request.getRefreshToken();
         String username = extractRefreshUsername(token);

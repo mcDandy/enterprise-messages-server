@@ -7,12 +7,23 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Persists per-user outbound packets in PostgreSQL and removes them after acknowledgement.
+ */
+
 @Repository
 @RequiredArgsConstructor
 public class PostgresUserQueue {
     private static final String QUEUE_PREFIX = "ems_user_";
     private final JdbcTemplate jdbc;
 
+    /**
+     * Builds the internal PGMQ table name for a user.
+     *
+     * @param userId positive account ID
+     * @return a queue name containing only the fixed prefix and numeric ID
+     * @throws IllegalArgumentException when {@code userId} is not positive
+     */
     public static String queueName(long userId) {
         if (userId <= 0) throw new IllegalArgumentException("User ID must be positive");
         return QUEUE_PREFIX + userId;
@@ -53,6 +64,15 @@ public class PostgresUserQueue {
         return id;
     }
 
+    /**
+     * Claims up to {@code limit} messages using PGMQ visibility timeout semantics.
+     * A claim makes messages temporarily invisible to other consumers but does not delete them.
+     *
+     * @param userId queue owner
+     * @param visibilityTimeoutSeconds duration before unacknowledged messages can be claimed again
+     * @param limit maximum number of queue entries to claim
+     * @return claimed entries with their optional application message IDs
+     */
     public List<QueuedPacket> claimForUser(long userId, int visibilityTimeoutSeconds, int limit) {
         if (visibilityTimeoutSeconds <= 0 || limit <= 0)
             throw new IllegalArgumentException("Invalid queue claim limit/timeout");
@@ -65,6 +85,7 @@ public class PostgresUserQueue {
                 queueName(userId), visibilityTimeoutSeconds, limit);
     }
 
+    /** @return the current queue head without claiming or deleting it, or an empty list */
     public List<QueuedPacket> peekFirstForUser(long userId) {
         return jdbc.query(
                 "SELECT msg_id, decode(message->>'frame', 'base64') AS frame, " +
@@ -74,6 +95,7 @@ public class PostgresUserQueue {
                         rs.getObject("application_message_id", Long.class)));
     }
 
+    /** @return whether a queue-head packet was removed */
     public boolean acknowledgeFirstForUser(long userId) {
         return acknowledgeFirstPacketForUser(userId).isPresent();
     }

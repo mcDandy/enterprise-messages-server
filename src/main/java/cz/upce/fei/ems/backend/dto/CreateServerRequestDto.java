@@ -8,6 +8,10 @@ import jakarta.validation.constraints.Size;
 import cz.upce.fei.ems.backend.validation.constraints.NoControlCharacters;
 import lombok.Data;
 
+/**
+ * Validated request body used to create a message server.
+ */
+
 @Data
 @Schema(description = "Požadavek na vytvoření nového serveru")
 public class CreateServerRequestDto {

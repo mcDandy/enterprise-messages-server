@@ -8,6 +8,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SourceType;
 import java.time.OffsetDateTime;
 
+/**
+ * Persists an encrypted message and its channel, sender, and creation metadata.
+ */
+
 @Entity
 @Table(name = "message")
 @Getter
@@ -25,6 +29,7 @@ public class Message {
     @Column(name = "sender_id", nullable = false)
     private Long senderId;
 
+    /** Opaque ciphertext; the server stores and forwards it without decrypting it. */
     @Column(name = "ciphertext", nullable = false)
     private byte[] ciphertext;
 
@@ -32,6 +37,7 @@ public class Message {
     @Column(name = "sent_at", nullable = false, updatable = false)
     private OffsetDateTime sentAt;
 
+    /** Database row for the channel-key version used by the sender. */
     @Column(name = "channel_key_id", nullable = false)
     private Long channelKeyId;
 }

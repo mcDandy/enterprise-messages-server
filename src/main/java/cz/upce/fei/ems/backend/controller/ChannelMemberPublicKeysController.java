@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 import java.util.List;
 
+/**
+ * Exposes public keys for users who belong to a channel.
+ */
+
 @RestController
 @RequiredArgsConstructor
 @Tag(name = "Channel keys")
