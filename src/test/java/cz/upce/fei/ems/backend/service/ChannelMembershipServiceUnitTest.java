@@ -33,6 +33,8 @@ class ChannelMembershipServiceUnitTest {
     @Mock
     private MessageRepository messageRepository;
     @Mock
+    private ChannelMemberInfoService channelMemberInfoService;
+    @Mock
     private AppUserRepository appUserRepository;
     @Mock
     private MessageServerService serverService;

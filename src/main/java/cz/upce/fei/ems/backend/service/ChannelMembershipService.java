@@ -23,6 +23,7 @@ public class ChannelMembershipService {
     private final ChannelRepository channelRepository;
     private final ChannelMemberRepository channelMemberRepository;
     private final MessageRepository messageRepository;
+    private final ChannelMemberInfoService channelMemberInfoService;
     private final AppUserRepository appUserRepository;
     private final MessageServerService serverService;
     private final KeyRotationService keyRotationService;
@@ -39,7 +40,14 @@ public class ChannelMembershipService {
     @Transactional
     public void markAsRead(Long messageId, Long userId) {
         ReceiptContext context = validateReceipt(messageId, userId);
-        channelMemberRepository.advanceRead(context.channelId(), context.userId(), messageId);
+        int updated = channelMemberRepository.advanceRead(context.channelId(), context.userId(), messageId);
+        if (updated == 0) {
+            throw new SecurityException("User is not a member of this channel.");
+        }
+        ChannelMember member = channelMemberRepository.findById(
+                new ChannelMemberId(context.channelId(), context.userId()))
+                .orElseThrow(() -> new IllegalStateException("Channel membership disappeared while marking read."));
+        channelMemberInfoService.publishToChannelMembers(member);
     }
 
     private ReceiptContext validateReceipt(Long messageId, Long userId) {
