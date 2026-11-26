@@ -4,7 +4,6 @@ import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.Message;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
-import cz.upce.fei.ems.backend.repository.MessageReceiptRepository;
 import cz.upce.fei.ems.backend.repository.MessageRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,8 +21,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class MessageReceiptServiceUnitTest {
 
-    @Mock
-    private MessageReceiptRepository messageReceiptRepository;
     @Mock
     private AppUserRepository appUserRepository;
     @Mock
@@ -56,7 +53,7 @@ class MessageReceiptServiceUnitTest {
 
         messageReceiptService.markAsDelivered(10L, "testuser");
 
-        verify(messageReceiptRepository).upsertDelivered(100L, 1L, 10L);
+        verify(channelMemberRepository).advanceDelivered(100L, 1L, 10L);
     }
 
     @Test
