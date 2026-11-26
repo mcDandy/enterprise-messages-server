@@ -4,6 +4,7 @@ import cz.upce.fei.ems.backend.dto.CreateServerRequestDto;
 import cz.upce.fei.ems.backend.dto.ServerResponseDto;
 import cz.upce.fei.ems.backend.dto.UpdateServerRequestDto;
 import cz.upce.fei.ems.backend.service.MessageServerService;
+import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -67,7 +68,7 @@ public class MessageServerController {
             }
     )
     @GetMapping("/{id}")
-    public ResponseEntity<ServerResponseDto> getServer(@PathVariable Long id) {
+    public ResponseEntity<ServerResponseDto> getServer(@PathVariable @PositiveId Long id) {
         return serverService.getServer(id)
                 .map(ResponseEntity::ok)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Server not found."));
@@ -85,7 +86,7 @@ public class MessageServerController {
     )
     @PutMapping("/{id}")
     public ResponseEntity<ServerResponseDto> updateServer(
-            @PathVariable Long id,
+            @PathVariable @PositiveId Long id,
             @Valid @RequestBody UpdateServerRequestDto request,
             Principal principal) {
         return serverService.updateServer(id, request, principal.getName())
@@ -103,7 +104,7 @@ public class MessageServerController {
             }
     )
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteServer(@PathVariable Long id, Principal principal) {
+    public ResponseEntity<Void> deleteServer(@PathVariable @PositiveId Long id, Principal principal) {
         serverService.deleteServer(id, principal.getName());
         return ResponseEntity.noContent().build();
     }

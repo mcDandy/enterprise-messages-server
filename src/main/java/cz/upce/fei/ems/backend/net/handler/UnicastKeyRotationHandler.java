@@ -4,6 +4,7 @@ import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
+import cz.upce.fei.ems.backend.net.protocol.PacketValidation;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.service.KeyRotationService;
 import lombok.RequiredArgsConstructor;
@@ -67,9 +68,17 @@ public class UnicastKeyRotationHandler implements PacketHandler {
     }
 
     private boolean isValidPayload(WebSocketSession session, byte[] payload) throws Exception {
-        if (payload == null || payload.length < 9) {
+        if (payload == null || payload.length < 2 * Long.BYTES + 1
+                || payload.length > PacketValidation.MAX_PAYLOAD_BYTES) {
             log.warn("Invalid unicast rotation payload length: {}", payload != null ? payload.length : 0);
             dispatcher.sendError(session, "Invalid unicast rotation payload.");
+            return false;
+        }
+        ByteBuffer header = ByteBuffer.wrap(payload);
+        long recipientUserId = header.getLong();
+        long channelId = header.getLong();
+        if (recipientUserId <= 0 || channelId <= 0) {
+            dispatcher.sendError(session, "Recipient and channel IDs must be positive.");
             return false;
         }
         log.debug("Payload received successfully, size: {} bytes", payload.length);

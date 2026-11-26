@@ -5,6 +5,7 @@ import cz.upce.fei.ems.backend.domain.ChannelKey;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
+import cz.upce.fei.ems.backend.net.protocol.PacketValidation;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
@@ -39,7 +40,15 @@ public class ChatMessageHandler implements PacketHandler {
 
         byte[] payload = packet.getPayload();
         if (payload == null || payload.length < Integer.BYTES) {
-            dispatcher.sendError(session, "Invalid chat message payload: missing channel ID.");
+            dispatcher.sendError(session, "Invalid chat message packet: missing channel ID.");
+            return;
+        }
+        if (payload.length == Integer.BYTES) {
+            dispatcher.sendError(session, "Invalid chat message packet: missing ciphertext.");
+            return;
+        }
+        if (payload.length > PacketValidation.MAX_PAYLOAD_BYTES) {
+            dispatcher.sendError(session, "Invalid chat message payload size.");
             return;
         }
 

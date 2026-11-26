@@ -3,6 +3,7 @@ package cz.upce.fei.ems.backend.controller;
 import cz.upce.fei.ems.backend.dto.AddChannelMemberRequestDto;
 import cz.upce.fei.ems.backend.dto.ChannelMemberResponseDto;
 import cz.upce.fei.ems.backend.service.ChannelMembershipService;
+import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -33,7 +34,8 @@ public class ChannelMembershipController {
             }
     )
     @GetMapping
-    public ResponseEntity<List<ChannelMemberResponseDto>> getChannelMembers(@PathVariable Long channelId) {
+    public ResponseEntity<List<ChannelMemberResponseDto>> getChannelMembers(
+            @PathVariable @PositiveId Long channelId) {
         return ResponseEntity.ok(channelMembershipService.getChannelMembers(channelId));
     }
 
@@ -49,7 +51,7 @@ public class ChannelMembershipController {
     )
     @PostMapping
     public ResponseEntity<Void> addMemberToChannel(
-            @PathVariable Long channelId,
+            @PathVariable @PositiveId Long channelId,
             @Valid @RequestBody AddChannelMemberRequestDto request,
             Principal principal) {
         channelMembershipService.addMemberAndTriggerKeyRotation(channelId, request.getUserId(), principal.getName());
@@ -67,8 +69,8 @@ public class ChannelMembershipController {
     )
     @DeleteMapping("/{userId}")
     public ResponseEntity<Void> removeMemberFromChannel(
-            @PathVariable Long channelId,
-            @PathVariable Long userId,
+            @PathVariable @PositiveId Long channelId,
+            @PathVariable @PositiveId Long userId,
             Principal principal) {
         channelMembershipService.removeMemberFromChannel(channelId, userId, principal.getName());
         return ResponseEntity.noContent().build();

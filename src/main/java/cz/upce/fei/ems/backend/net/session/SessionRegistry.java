@@ -3,6 +3,7 @@ package cz.upce.fei.ems.backend.net.session;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.CloseStatus;
 
 import java.io.IOException;
 import java.util.Map;
@@ -20,8 +21,15 @@ public class SessionRegistry {
     private final Map<Long, Set<String>> channelMembers = new ConcurrentHashMap<>();
 
     public void registerSession(String username, WebSocketSession session) {
-        activeSessions.put(username, session);
+        WebSocketSession previous = activeSessions.put(username, session);
         session.getAttributes().put("username", username);
+        if (previous != null && previous != session && previous.isOpen()) {
+            try {
+                previous.close(CloseStatus.GOING_AWAY);
+            } catch (IOException e) {
+                log.debug("Could not close superseded WebSocket session for {}: {}", username, e.getMessage());
+            }
+        }
     }
 
     @SuppressWarnings("resource") // The WebSocket handler owns the session lifecycle.

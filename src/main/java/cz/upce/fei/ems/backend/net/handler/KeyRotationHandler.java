@@ -32,6 +32,11 @@ public class KeyRotationHandler implements PacketHandler {
             return;
         }
 
+        if (packet.getPayload() != null && packet.getPayload().length != 0) {
+            dispatcher.sendError(session, "Invalid key rotation request payload.");
+            return;
+        }
+
         keyRotationService.handleRotationRequest(channelId, senderUsername);
     }
 }

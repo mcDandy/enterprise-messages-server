@@ -2,6 +2,7 @@ package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.dto.UserKeyResponseDto;
 import cz.upce.fei.ems.backend.service.ChannelService;
+import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -30,7 +31,7 @@ public class ChannelMemberPublicKeysController {
     )
     @GetMapping("/api/channels/{chId}/keys")
     public ResponseEntity<List<UserKeyResponseDto>> getChannelMemberPublicKeys(
-            @PathVariable Long chId,
+            @PathVariable @PositiveId Long chId,
             Principal principal
     ) {
         List<UserKeyResponseDto> keys = channelService.getActivePublicKeysForChannel(chId, principal.getName());

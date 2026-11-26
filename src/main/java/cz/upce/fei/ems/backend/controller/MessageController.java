@@ -2,6 +2,9 @@ package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.dto.MessageResponseDto;
 import cz.upce.fei.ems.backend.service.MessageService;
+import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
+import cz.upce.fei.ems.backend.validation.constraints.ValidPageIndex;
+import cz.upce.fei.ems.backend.validation.constraints.ValidPageSize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -31,7 +34,7 @@ public class MessageController {
             }
     )
     @GetMapping("/recent")
-    public ResponseEntity<List<MessageResponseDto>> getRecentMessages(@PathVariable Long channelId) {
+    public ResponseEntity<List<MessageResponseDto>> getRecentMessages(@PathVariable @PositiveId Long channelId) {
         return ResponseEntity.ok(messageService.getRecentMessages(channelId));
     }
 
@@ -55,9 +58,9 @@ public class MessageController {
     )
     @GetMapping
     public ResponseEntity<Slice<MessageResponseDto>> getMessagesPage(
-            @PathVariable Long channelId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size) {
+            @PathVariable @PositiveId Long channelId,
+            @RequestParam(defaultValue = "0") @ValidPageIndex int page,
+            @RequestParam(defaultValue = "50") @ValidPageSize int size) {
         return ResponseEntity.ok(messageService.getMessagesPage(channelId, page, size));
     }
 }

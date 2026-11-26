@@ -2,6 +2,9 @@ package cz.upce.fei.ems.backend.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import cz.upce.fei.ems.backend.validation.RequestBodyLimitFilter;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -11,6 +14,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -60,10 +65,19 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MissingServletRequestParameterException.class})
     public ResponseEntity<ProblemDetail> handleUnreadableRequest(Exception ex, HttpServletRequest request) {
+        if (hasCause(ex, RequestBodyLimitFilter.RequestBodyTooLargeException.class)) {
+            return response(HttpStatus.PAYLOAD_TOO_LARGE, "Request body is too large.", request);
+        }
         String message = ex instanceof MissingServletRequestParameterException missing
                 ? "Required parameter '" + missing.getParameterName() + "' is missing."
                 : "Request body is missing or malformed.";
         return response(HttpStatus.BAD_REQUEST, message, request);
+    }
+
+    @ExceptionHandler({DataIntegrityViolationException.class, OptimisticLockingFailureException.class})
+    public ResponseEntity<ProblemDetail> handleConcurrentWrite(RuntimeException ex, HttpServletRequest request) {
+        return response(HttpStatus.CONFLICT,
+                "The request conflicts with the current data state.", request);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -77,6 +91,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleMethodNotSupported(
             HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
         return response(HttpStatus.METHOD_NOT_ALLOWED, "HTTP method is not supported for this endpoint.", request);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ProblemDetail> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+        return response(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Request content type is not supported.", request);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    public ResponseEntity<ProblemDetail> handleNotAcceptable(
+            HttpMediaTypeNotAcceptableException ex, HttpServletRequest request) {
+        return response(HttpStatus.NOT_ACCEPTABLE, "Requested response format is not available.", request);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
@@ -127,5 +153,12 @@ public class GlobalExceptionHandler {
 
     private String safeMessage(RuntimeException ex, String fallback) {
         return ex.getMessage() == null || ex.getMessage().isBlank() ? fallback : ex.getMessage();
+    }
+
+    private boolean hasCause(Throwable error, Class<? extends Throwable> type) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (type.isInstance(cause)) return true;
+        }
+        return false;
     }
 }

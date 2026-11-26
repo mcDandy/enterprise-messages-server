@@ -4,6 +4,7 @@ import cz.upce.fei.ems.backend.dto.AddMemberRequestDto;
 import cz.upce.fei.ems.backend.dto.ServerMemberResponseDto;
 import cz.upce.fei.ems.backend.dto.UpdateMemberRoleRequestDto;
 import cz.upce.fei.ems.backend.service.ServerMembershipService;
+import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -33,7 +34,7 @@ public class ServerMembershipController {
             }
     )
     @GetMapping
-    public ResponseEntity<List<ServerMemberResponseDto>> getMembers(@PathVariable Long serverId) {
+    public ResponseEntity<List<ServerMemberResponseDto>> getMembers(@PathVariable @PositiveId Long serverId) {
         return ResponseEntity.ok(membershipService.getServerMembers(serverId));
     }
 
@@ -47,7 +48,7 @@ public class ServerMembershipController {
     )
     @PostMapping
     public ResponseEntity<Void> addMember(
-            @PathVariable Long serverId,
+            @PathVariable @PositiveId Long serverId,
             @Valid @RequestBody AddMemberRequestDto request,
             Principal principal) {
 
@@ -65,8 +66,8 @@ public class ServerMembershipController {
     )
     @DeleteMapping("/{userId}")
     public ResponseEntity<Void> removeMember(
-            @PathVariable Long serverId,
-            @PathVariable Long userId,
+            @PathVariable @PositiveId Long serverId,
+            @PathVariable @PositiveId Long userId,
             Principal principal) {
         membershipService.removeMemberFromServer(serverId, userId, principal.getName());
         return ResponseEntity.noContent().build();
@@ -83,8 +84,8 @@ public class ServerMembershipController {
     )
     @PutMapping("/{userId}/role")
     public ResponseEntity<Void> updateMemberRole(
-            @PathVariable Long serverId,
-            @PathVariable Long userId,
+            @PathVariable @PositiveId Long serverId,
+            @PathVariable @PositiveId Long userId,
             @Valid @RequestBody UpdateMemberRoleRequestDto request,
             Principal principal) {
 

@@ -136,6 +136,23 @@ first start**; changing it later does not regenerate an existing certificate.
 The self-signed `certificate.pem` must be trusted by Android. Use a trusted
 certificate outside development.
 
+HTTP request bodies are limited to 1 MiB by default. Set
+`API_MAX_REQUEST_BODY_BYTES` to change the limit when deploying the backend.
+Request URLs are limited to 4 KiB, request lines plus headers to 16 KiB, and
+requests to 100 headers and 100 parsed parameters. Requests with repeated query
+parameters or duplicate singleton/security headers are rejected. Bodies must
+use `application/json` (or an `application/*+json` type) encoded as UTF-8;
+compressed request bodies are rejected.
+Traffic protection allows a burst of up to 240 HTTP requests per client address
+and refills at 20 requests per second; the application also caps concurrent HTTP
+work at 128. WebSocket connections are capped at 2,000, with a 240-packet burst
+and 20 packets per second per client address. WebSocket packet processing is
+limited to 32 simultaneous operations, and idle connections close after 30
+minutes. These limits can be adjusted with `API_MAX_CONCURRENT_REQUESTS`,
+`WS_MAX_CONCURRENT_MESSAGES` and `WS_MAX_CONNECTIONS`. Tomcat and the database
+pool also have fixed upper bounds to prevent unbounded thread or connection
+growth.
+
 By default the containers are named `ems-server`, `db` and `cert-init`. Set
 `BACKEND_CONTAINER_NAME`, `DB_CONTAINER_NAME` and `CERT_INIT_CONTAINER_NAME`
 in `.env` to rename them. Docker container names must be unique across all

@@ -4,6 +4,7 @@ import cz.upce.fei.ems.backend.dto.ChannelResponseDto;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
 import cz.upce.fei.ems.backend.service.ChannelService;
+import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -36,7 +37,7 @@ public class ChannelController {
             }
     )
     @GetMapping("/api/servers/{serverId}/channels")
-    public ResponseEntity<List<ChannelResponseDto>> getChannels(@PathVariable Long serverId) {
+    public ResponseEntity<List<ChannelResponseDto>> getChannels(@PathVariable @PositiveId Long serverId) {
         return channelService.getChannelsByServerId(serverId)
                 .map(ResponseEntity::ok)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Server not found."));
@@ -52,7 +53,7 @@ public class ChannelController {
             }
     )
     @GetMapping("/api/channels/{channelId}")
-    public ResponseEntity<ChannelResponseDto> getChannel(@PathVariable Long channelId) {
+    public ResponseEntity<ChannelResponseDto> getChannel(@PathVariable @PositiveId Long channelId) {
         return channelService.getChannelById(channelId)
                 .map(ResponseEntity::ok)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Channel not found."));
@@ -71,7 +72,7 @@ public class ChannelController {
     )
     @PostMapping("/api/servers/{serverId}/channels")
     public ResponseEntity<ChannelResponseDto> createChannel(
-            @PathVariable Long serverId,
+            @PathVariable @PositiveId Long serverId,
             @Valid @RequestBody CreateChannelRequestDto request,
             Principal principal) {
         ChannelResponseDto savedChannel = channelService.createChannel(serverId, request, principal.getName());
@@ -90,7 +91,7 @@ public class ChannelController {
     )
     @PutMapping("/api/channels/{channelId}")
     public ResponseEntity<ChannelResponseDto> updateChannel(
-            @PathVariable Long channelId,
+            @PathVariable @PositiveId Long channelId,
             @Valid @RequestBody UpdateChannelRequestDto request,
             Principal principal) {
         return channelService.updateChannel(channelId, request, principal.getName())
@@ -109,7 +110,7 @@ public class ChannelController {
     )
     @DeleteMapping("/api/channels/{channelId}")
     public ResponseEntity<Void> deleteChannel(
-            @PathVariable Long channelId,
+            @PathVariable @PositiveId Long channelId,
             Principal principal) {
         channelService.deleteChannel(channelId, principal.getName());
         return ResponseEntity.noContent().build();
@@ -126,7 +127,7 @@ public class ChannelController {
     )
     @GetMapping("/api/servers/{serverId}/channels/my")
     public ResponseEntity<List<ChannelResponseDto>> getMyChannelsForServer(
-            @PathVariable Long serverId,
+            @PathVariable @PositiveId Long serverId,
             Principal principal) {
         return ResponseEntity.ok(channelService.getMyChannelsForServer(serverId, principal.getName()));
     }

@@ -147,11 +147,14 @@ class GlobalExceptionHandlerTest {
                 mappedMethods++;
             }
         }
-        assertEquals(13, mappedMethods);
+        assertEquals(16, mappedMethods);
         assertMapped(HttpMessageNotReadableException.class, "handleUnreadableRequest");
         assertMapped(MissingServletRequestParameterException.class, "handleUnreadableRequest");
         assertMapped(NoResourceFoundException.class, "handleNotFound");
         assertMapped(Exception.class, "handleUnexpected");
+        assertMapped(org.springframework.web.HttpMediaTypeNotSupportedException.class, "handleUnsupportedMediaType");
+        assertMapped(org.springframework.web.HttpMediaTypeNotAcceptableException.class, "handleNotAcceptable");
+        assertMapped(org.springframework.dao.DataIntegrityViolationException.class, "handleConcurrentWrite");
     }
 
     private void assertMapped(Class<? extends Throwable> exception, String expectedHandler) {

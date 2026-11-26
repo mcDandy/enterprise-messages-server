@@ -25,6 +25,12 @@ public class PacketCodec {
     }
 
     public Packet decode(ByteBuffer buffer) {
+        if (buffer == null || !buffer.hasRemaining()) {
+            throw new IllegalArgumentException("Packet frame is empty");
+        }
+        if (buffer.remaining() > PacketValidation.MAX_PAYLOAD_BYTES + TYPE_FIELD_SIZE) {
+            throw new IllegalArgumentException("Packet frame exceeds the maximum size");
+        }
         byte type = buffer.get();
         byte[] payload = new byte[buffer.remaining()];
         buffer.get(payload);

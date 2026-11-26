@@ -7,8 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
-import java.nio.ByteBuffer;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -38,18 +36,11 @@ public class PacketRouter {
         byte[] payload = packet.getPayload();
         int payloadSize = payload != null ? payload.length : 0;
         String typeHex = String.format("0x%02X", packet.getType());
-        ByteBuffer frame = ByteBuffer.allocate(Byte.BYTES + payloadSize)
-                .put(packet.getType());
-        if (payloadSize > 0) {
-            frame.put(payload);
-        }
-
-        log.debug("Incoming packet -> Type: {} (code: {}), Session ID: {}, Payload size: {} bytes, Frame: {}",
+        log.debug("Incoming packet -> Type: {} (code: {}), Session ID: {}, Payload size: {} bytes",
                 PacketType.fromCode(packet.getType()),
                 typeHex,
                 session != null ? session.getId() : "unknown",
-                payloadSize,
-                HexFormat.of().formatHex(frame.array()));
+                payloadSize);
 
         PacketType typeEnum = PacketType.fromCode(packet.getType());
         PacketHandler handler = handlers.get(typeEnum);

@@ -43,6 +43,10 @@ public class ReadPacketHandler implements PacketHandler {
         }
 
         long messageId = ByteBuffer.wrap(payload).getLong();
+        if (messageId <= 0) {
+            dispatcher.sendError(session, "Invalid read packet. Message ID must be positive.");
+            return;
+        }
         try {
             channelMembershipService.markAsRead(messageId, user.getId());
         } catch (IllegalArgumentException | SecurityException e) {

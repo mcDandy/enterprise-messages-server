@@ -3,6 +3,7 @@ package cz.upce.fei.ems.backend.controller;
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.dto.*;
 import cz.upce.fei.ems.backend.service.UserService;
+import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -78,7 +79,7 @@ public class UserController {
             }
     )
     @GetMapping("/{userId}/key")
-    public ResponseEntity<UserKeyResponseDto> getUserPublicKey(@PathVariable Long userId) {
+    public ResponseEntity<UserKeyResponseDto> getUserPublicKey(@PathVariable @PositiveId Long userId) {
         return userService.getActivePublicKeyResponse(userId)
                 .map(ResponseEntity::ok)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Public key not found."));
