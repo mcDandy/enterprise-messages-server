@@ -1,6 +1,7 @@
 package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.domain.AppUser;
+import cz.upce.fei.ems.backend.dto.ActionResponseDto;
 import cz.upce.fei.ems.backend.service.BanService;
 import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
 import lombok.RequiredArgsConstructor;
@@ -16,14 +17,14 @@ public class AdminController {
     private final BanService banService;
 
     @PostMapping("/{id}/ban")
-    public ResponseEntity<Void> banUser(@PathVariable @PositiveId Long id, @AuthenticationPrincipal AppUser admin) {
+    public ResponseEntity<ActionResponseDto> banUser(@PathVariable @PositiveId Long id, @AuthenticationPrincipal AppUser admin) {
         banService.banUserGlobally(admin.getId(), id);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ActionResponseDto.completed());
     }
 
     @PostMapping("/{id}/unban")
-    public ResponseEntity<Void> unbanUser(@PathVariable @PositiveId Long id, @AuthenticationPrincipal AppUser admin) {
+    public ResponseEntity<ActionResponseDto> unbanUser(@PathVariable @PositiveId Long id, @AuthenticationPrincipal AppUser admin) {
         banService.unbanUserGlobally(admin.getId(), id);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ActionResponseDto.completed());
     }
 }

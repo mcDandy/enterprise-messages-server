@@ -48,10 +48,10 @@ public class UserController {
             }
     )
     @PutMapping("/me/display-name")
-    public ResponseEntity<Void> updateDisplayName(
+    public ResponseEntity<ActionResponseDto> updateDisplayName(
             @Valid @RequestBody UpdateDisplayNameRequestDto request, @AuthenticationPrincipal AppUser user) {
         userService.updateDisplayName(user.getUsername(), request.getDisplayName());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ActionResponseDto.completed());
     }
 
     @Operation(
@@ -62,11 +62,11 @@ public class UserController {
             }
     )
     @PostMapping("/me/keys")
-    public ResponseEntity<Void> rotatePublicKey(
+    public ResponseEntity<ActionResponseDto> rotatePublicKey(
             @Valid @RequestBody RotatePublicKeyRequestDto request, @AuthenticationPrincipal AppUser user
     ) {
         userService.rotatePublicKey(user.getUsername(), request.getPublicKey());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ActionResponseDto.completed());
     }
 
     @Operation(

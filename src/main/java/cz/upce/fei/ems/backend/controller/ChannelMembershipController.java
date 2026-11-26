@@ -1,6 +1,7 @@
 package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.dto.AddChannelMemberRequestDto;
+import cz.upce.fei.ems.backend.dto.ActionResponseDto;
 import cz.upce.fei.ems.backend.dto.ChannelMemberResponseDto;
 import cz.upce.fei.ems.backend.service.ChannelMembershipService;
 import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
@@ -50,12 +51,12 @@ public class ChannelMembershipController {
             }
     )
     @PostMapping
-    public ResponseEntity<Void> addMemberToChannel(
+    public ResponseEntity<ActionResponseDto> addMemberToChannel(
             @PathVariable @PositiveId Long channelId,
             @Valid @RequestBody AddChannelMemberRequestDto request,
             Principal principal) {
         channelMembershipService.addMemberAndTriggerKeyRotation(channelId, request.getUserId(), principal.getName());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ActionResponseDto.completed());
     }
 
     @Operation(

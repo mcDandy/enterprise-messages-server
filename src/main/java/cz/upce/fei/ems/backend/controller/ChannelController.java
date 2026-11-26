@@ -1,6 +1,7 @@
 package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.dto.ChannelResponseDto;
+import cz.upce.fei.ems.backend.dto.ActionResponseDto;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
 import cz.upce.fei.ems.backend.service.ChannelService;

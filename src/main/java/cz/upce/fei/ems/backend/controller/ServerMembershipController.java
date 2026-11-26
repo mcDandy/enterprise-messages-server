@@ -1,6 +1,7 @@
 package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.dto.AddMemberRequestDto;
+import cz.upce.fei.ems.backend.dto.ActionResponseDto;
 import cz.upce.fei.ems.backend.dto.ServerMemberResponseDto;
 import cz.upce.fei.ems.backend.dto.UpdateMemberRoleRequestDto;
 import cz.upce.fei.ems.backend.service.ServerMembershipService;
@@ -47,13 +48,13 @@ public class ServerMembershipController {
             }
     )
     @PostMapping
-    public ResponseEntity<Void> addMember(
+    public ResponseEntity<ActionResponseDto> addMember(
             @PathVariable @PositiveId Long serverId,
             @Valid @RequestBody AddMemberRequestDto request,
             Principal principal) {
 
         membershipService.addMemberToServer(serverId, request.getUserId(), request.getRole(), principal.getName());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ActionResponseDto.completed());
     }
 
     @Operation(
@@ -83,13 +84,13 @@ public class ServerMembershipController {
             }
     )
     @PutMapping("/{userId}/role")
-    public ResponseEntity<Void> updateMemberRole(
+    public ResponseEntity<ActionResponseDto> updateMemberRole(
             @PathVariable @PositiveId Long serverId,
             @PathVariable @PositiveId Long userId,
             @Valid @RequestBody UpdateMemberRoleRequestDto request,
             Principal principal) {
 
         membershipService.updateMemberRole(serverId, userId, request.getRole(), principal.getName());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ActionResponseDto.completed());
     }
 }

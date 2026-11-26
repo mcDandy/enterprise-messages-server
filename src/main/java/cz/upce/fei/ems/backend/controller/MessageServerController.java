@@ -1,6 +1,7 @@
 package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.dto.CreateServerRequestDto;
+import cz.upce.fei.ems.backend.dto.ActionResponseDto;
 import cz.upce.fei.ems.backend.dto.ServerResponseDto;
 import cz.upce.fei.ems.backend.dto.UpdateServerRequestDto;
 import cz.upce.fei.ems.backend.service.MessageServerService;

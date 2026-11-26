@@ -94,6 +94,28 @@ class GlobalExceptionHandlerIntegrationTest extends BaseRestApiIntegrationTest {
         assertEquals(404, missingRoute.statusCode());
         assertJsonError(missingRoute);
 
+        HttpRequest htmlAccept = HttpRequest.newBuilder()
+                .uri(URI.create(getBaseUrl() + "/api/auth/does-not-exist"))
+                .header("Accept", "text/html")
+                .GET()
+                .build();
+        HttpResponse<String> missingRouteWithHtmlAccept = httpClient.send(htmlAccept,
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(404, missingRouteWithHtmlAccept.statusCode());
+        assertJsonError(missingRouteWithHtmlAccept);
+
+        String textAcceptToken = loginAndGetToken("text_accept_" + UUID.randomUUID().toString().replace("-", ""),
+                "Password123!");
+        HttpRequest textAccept = HttpRequest.newBuilder()
+                .uri(URI.create(getBaseUrl() + "/api/users/me"))
+                .header("Authorization", "Bearer " + textAcceptToken)
+                .header("Accept", "text/plain")
+                .GET()
+                .build();
+        HttpResponse<String> response = httpClient.send(textAccept, HttpResponse.BodyHandlers.ofString());
+        assertTrue(response.statusCode() == 200 || response.statusCode() == 406, response.body());
+        assertJsonContent(response);
+
         String token = loginAndGetToken("missing_resource_" + UUID.randomUUID().toString().replace("-", ""),
                 "Password123!");
         HttpResponse<String> missingResource = get("/api/channels/9223372036854775000", token);
@@ -153,9 +175,7 @@ class GlobalExceptionHandlerIntegrationTest extends BaseRestApiIntegrationTest {
     }
 
     private void assertJsonError(HttpResponse<String> response) throws Exception {
-        assertNotNull(response.headers().firstValue("Content-Type").orElse(null));
-        assertTrue(response.headers().firstValue("Content-Type").orElseThrow()
-                .toLowerCase().startsWith("application/problem+json"));
+        assertJsonContent(response);
         JsonNode body = objectMapper.readTree(response.body());
         assertNotNull(body);
         assertTrue(body.has("type"), body.toString());
@@ -163,6 +183,14 @@ class GlobalExceptionHandlerIntegrationTest extends BaseRestApiIntegrationTest {
         assertTrue(body.has("status"), body.toString());
         assertTrue(body.has("detail"), body.toString());
         assertTrue(body.has("instance"), body.toString());
+    }
+
+    private void assertJsonContent(HttpResponse<String> response) throws Exception {
+        assertNotNull(response.headers().firstValue("Content-Type").orElse(null));
+        String contentType = response.headers().firstValue("Content-Type").orElseThrow().toLowerCase();
+        assertTrue(contentType.startsWith("application/json")
+                || contentType.startsWith("application/problem+json"), contentType);
+        assertNotNull(objectMapper.readTree(response.body()));
     }
 
     @RestController

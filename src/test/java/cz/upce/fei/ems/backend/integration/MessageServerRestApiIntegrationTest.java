@@ -76,8 +76,8 @@ public class MessageServerRestApiIntegrationTest extends BaseRestApiIntegrationT
         Long channelId = objectMapper.readTree(channelResponse.body()).get("id").asLong();
 
         HttpResponse<String> deleteResponse = delete("/api/servers/" + serverId, token);
-        assertEquals(204, deleteResponse.statusCode());
-        assertEquals(204, delete("/api/servers/" + serverId, token).statusCode());
+        assertNoContent(deleteResponse);
+        assertNoContent(delete("/api/servers/" + serverId, token));
 
         HttpResponse<String> getResponse = get("/api/servers/" + serverId, token);
         assertEquals(404, getResponse.statusCode());
@@ -90,6 +90,6 @@ public class MessageServerRestApiIntegrationTest extends BaseRestApiIntegrationT
 
         HttpResponse<String> response = delete("/api/servers/999999", token);
 
-        assertEquals(204, response.statusCode());
+        assertNoContent(response);
     }
 }

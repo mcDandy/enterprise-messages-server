@@ -66,8 +66,8 @@ public class ServerMembershipRestApiIntegrationTest extends BaseRestApiIntegrati
 
         // Remove member
         HttpResponse<String> removeResp = delete("/api/servers/" + serverId + "/members/" + userId, adminToken);
-        assertEquals(204, removeResp.statusCode());
-        assertEquals(204, delete("/api/servers/" + serverId + "/members/" + userId, adminToken).statusCode());
+        assertNoContent(removeResp);
+        assertNoContent(delete("/api/servers/" + serverId + "/members/" + userId, adminToken));
     }
 
     @Test
@@ -82,7 +82,7 @@ public class ServerMembershipRestApiIntegrationTest extends BaseRestApiIntegrati
         HttpResponse<String> response = delete(
                 "/api/servers/" + serverId + "/members/999999", adminToken);
 
-        assertEquals(204, response.statusCode());
+        assertNoContent(response);
     }
 
     @Test
@@ -96,7 +96,7 @@ public class ServerMembershipRestApiIntegrationTest extends BaseRestApiIntegrati
         Long serverId = objectMapper.readTree(serverResponse.body()).get("id").asLong();
 
         String deletePath = "/api/servers/" + serverId + "/members/" + adminUserId;
-        assertEquals(204, delete(deletePath, adminToken).statusCode());
-        assertEquals(204, delete(deletePath, adminToken).statusCode());
+        assertNoContent(delete(deletePath, adminToken));
+        assertNoContent(delete(deletePath, adminToken));
     }
 }
