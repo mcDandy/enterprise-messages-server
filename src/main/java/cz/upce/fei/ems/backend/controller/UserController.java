@@ -11,7 +11,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -34,7 +36,7 @@ public class UserController {
     public ResponseEntity<UserResponseDto> getCurrentUser(@AuthenticationPrincipal AppUser user) {
         return userService.getUserResponse(user)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
     }
 
     @Operation(
@@ -79,6 +81,6 @@ public class UserController {
     public ResponseEntity<UserKeyResponseDto> getUserPublicKey(@PathVariable Long userId) {
         return userService.getActivePublicKeyResponse(userId)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Public key not found."));
     }
 }

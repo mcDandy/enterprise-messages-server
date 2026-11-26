@@ -1,5 +1,6 @@
 package cz.upce.fei.ems.backend.config;
 
+import cz.upce.fei.ems.backend.exception.ApiErrorWriter;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -16,7 +17,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.authentication.www.BasicAuthenticationEntryPoint;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -42,7 +42,8 @@ public class SecurityConfig {
 
     @Bean
     @Order(1)
-    public SecurityFilterChain swaggerSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain swaggerSecurityFilterChain(HttpSecurity http, ApiErrorWriter errorWriter)
+            throws Exception {
         if (swaggerPassword.isBlank()) {
             throw new IllegalStateException("SWAGGER_PASSWORD must not be blank");
         }
@@ -55,9 +56,12 @@ public class SecurityConfig {
                 new InMemoryUserDetailsManager(swaggerUser));
         authenticationProvider.setPasswordEncoder(passwordEncoder);
 
-        var authenticationEntryPoint = new BasicAuthenticationEntryPoint();
-        authenticationEntryPoint.setRealmName("Swagger");
-        authenticationEntryPoint.afterPropertiesSet();
+        var authenticationEntryPoint = (org.springframework.security.web.AuthenticationEntryPoint)
+                (request, response, exception) -> {
+                    response.setHeader("WWW-Authenticate", "Basic realm=\"Swagger\"");
+                    errorWriter.write(request, response, org.springframework.http.HttpStatus.UNAUTHORIZED,
+                            "Swagger authentication is required.");
+                };
 
         http
                 .securityMatcher("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
@@ -75,7 +79,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, ApiErrorWriter errorWriter) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -88,6 +92,12 @@ public class SecurityConfig {
                         .requestMatchers("/**").authenticated()
                         .anyRequest().permitAll()
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, exception) -> errorWriter.write(
+                                request, response, org.springframework.http.HttpStatus.UNAUTHORIZED,
+                                "Authentication is required or invalid."))
+                        .accessDeniedHandler((request, response, exception) -> errorWriter.write(
+                                request, response, org.springframework.http.HttpStatus.FORBIDDEN, "Access denied.")))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

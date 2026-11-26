@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Principal;
 import java.util.List;
@@ -69,7 +70,7 @@ public class MessageServerController {
     public ResponseEntity<ServerResponseDto> getServer(@PathVariable Long id) {
         return serverService.getServer(id)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Server not found."));
     }
 
     @Operation(
@@ -89,7 +90,7 @@ public class MessageServerController {
             Principal principal) {
         return serverService.updateServer(id, request, principal.getName())
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Server not found."));
     }
 
     @Operation(

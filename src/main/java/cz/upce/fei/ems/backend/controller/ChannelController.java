@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Principal;
 import java.util.List;
@@ -38,7 +39,7 @@ public class ChannelController {
     public ResponseEntity<List<ChannelResponseDto>> getChannels(@PathVariable Long serverId) {
         return channelService.getChannelsByServerId(serverId)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Server not found."));
     }
 
     @Operation(
@@ -54,7 +55,7 @@ public class ChannelController {
     public ResponseEntity<ChannelResponseDto> getChannel(@PathVariable Long channelId) {
         return channelService.getChannelById(channelId)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Channel not found."));
     }
 
     @Operation(
@@ -94,7 +95,7 @@ public class ChannelController {
             Principal principal) {
         return channelService.updateChannel(channelId, request, principal.getName())
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Channel not found."));
     }
 
     @Operation(
