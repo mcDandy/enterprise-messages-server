@@ -151,4 +151,28 @@ esac
 # Migration 006 is idempotent and also backfills queues for pre-existing users.
 apply_migration 006_user_packet_queues.sql
 
-echo 'Database migrations 001-006: up to date.'
+# Migration 007 moves receipt progress onto existing channel memberships.
+receipt_state=$(psql_query "
+WITH member_columns AS (
+  SELECT count(*) AS present,
+         count(*) FILTER (WHERE data_type = 'bigint' AND is_nullable = 'YES') AS valid
+  FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'message_channel_member'
+    AND column_name IN ('last_delivered_message_id', 'last_read_message_id')
+)
+SELECT CASE
+  WHEN to_regclass('public.message_channel_member') IS NULL THEN 'unexpected'
+  WHEN to_regclass('public.message_receipt') IS NOT NULL
+       AND present = 0 THEN 'pending'
+  WHEN to_regclass('public.message_receipt') IS NULL
+       AND present = 2 AND valid = 2 THEN 'done'
+  ELSE 'unexpected'
+END FROM member_columns;")
+
+case "$receipt_state" in
+  pending) apply_migration 007_merge_channel_member_receipts.sql ;;
+  done) echo 'Migration 007: already applied (or fresh schema).' ;;
+  *) echo 'ERROR: Cannot identify receipt schema; refusing an unsafe migration 007.' >&2; exit 1 ;;
+esac
+
+echo 'Database migrations 001-007: up to date.'

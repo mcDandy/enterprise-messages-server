@@ -30,10 +30,12 @@ missing migrations in order:
 - **005** – moves to PGMQ queues (requires legacy pending tables to be empty).
 - **006** – creates one queue per user, queued rotation triggers and old
 archives must be empty.
+- **007** – moves delivery/read progress into `message_channel_member`. Only
+  current members retain their progress; former members' receipts are discarded.
 
 The runner skips migrations reflected in the schema, including for a newly
 initialized database. It stops on unexpected/partially upgraded schemas rather
-than applying potentially destructive DDL. Do not run migrations 002–005 by hand
+than applying potentially destructive DDL. Do not run migrations 002–005 or 007 by hand
 more than once.
 
 **Compatibility warning:** 003 assigns new UUID versions to historical channel

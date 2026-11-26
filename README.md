@@ -71,7 +71,7 @@ in this disposable PostgreSQL test cluster; the test role must have `CREATEDB`.
 They refuse to run unless the connection targets `nnpro_test`.
 
 The test database uses PostgreSQL 17 + PGMQ. The test migration runner brings
-older schemas up to migration 006; the Gradle suite includes
+older schemas up to migration 007; the Gradle suite includes
 `PostgresUserQueueIntegrationTest`, which uses the real database to verify
 per-recipient queues, opaque frames, visibility timeouts, and acknowledgments. The test
 refuses to run against database names other than `nnpro_test`.
@@ -119,7 +119,7 @@ docker compose up -d --build backend
 ```
 
 The migration runner recognizes the legacy table layout and applies any
-required migrations **001 → 002 → 003 → 004 → 005 → 006** in order. It skips migrations
+required migrations **001 → 002 → 003 → 004 → 005 → 006 → 007** in order. It skips migrations
 already reflected in the schema, including on a fresh database. Unknown or
 partially upgraded schema states cause an error rather than destructive guesses.
 Migration 005 requires the PostgreSQL 17 PGMQ image to be running and refuses

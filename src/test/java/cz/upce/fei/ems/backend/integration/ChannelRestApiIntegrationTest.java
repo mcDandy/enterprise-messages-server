@@ -3,13 +3,13 @@ package cz.upce.fei.ems.backend.integration;
 import cz.upce.fei.ems.backend.domain.MessageServerType;
 import cz.upce.fei.ems.backend.domain.ChannelKey;
 import cz.upce.fei.ems.backend.domain.Message;
-import cz.upce.fei.ems.backend.domain.MessageReceipt;
-import cz.upce.fei.ems.backend.domain.MessageReceiptId;
+import cz.upce.fei.ems.backend.domain.ChannelMember;
+import cz.upce.fei.ems.backend.domain.ChannelMemberId;
 import cz.upce.fei.ems.backend.dto.CreateChannelRequestDto;
 import cz.upce.fei.ems.backend.dto.CreateServerRequestDto;
 import cz.upce.fei.ems.backend.dto.UpdateChannelRequestDto;
 import cz.upce.fei.ems.backend.repository.ChannelKeyRepository;
-import cz.upce.fei.ems.backend.repository.MessageReceiptRepository;
+import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.MessageRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -28,7 +28,7 @@ public class ChannelRestApiIntegrationTest extends BaseRestApiIntegrationTest {
     @Autowired
     private MessageRepository messageRepository;
     @Autowired
-    private MessageReceiptRepository messageReceiptRepository;
+    private ChannelMemberRepository channelMemberRepository;
 
     @Test
     void shouldCreateAndGetChannel() throws Exception {
@@ -108,12 +108,11 @@ public class ChannelRestApiIntegrationTest extends BaseRestApiIntegrationTest {
         message.setCiphertext("ciphertext".getBytes(StandardCharsets.UTF_8));
         message = messageRepository.save(message);
 
-        MessageReceipt receipt = new MessageReceipt();
-        receipt.setMessageChannelId(channelId);
-        receipt.setUserId(userId);
-        receipt.setLastDeliveredMessageId(message.getId());
-        receipt.setLastReadMessageId(message.getId());
-        messageReceiptRepository.save(receipt);
+        ChannelMember member = channelMemberRepository.findById(new ChannelMemberId(channelId, userId))
+                .orElseThrow();
+        member.setLastDeliveredMessageId(message.getId());
+        member.setLastReadMessageId(message.getId());
+        channelMemberRepository.saveAndFlush(member);
 
         HttpResponse<String> deleteResponse = delete("/api/channels/" + channelId, token);
         assertEquals(204, deleteResponse.statusCode());
@@ -123,7 +122,7 @@ public class ChannelRestApiIntegrationTest extends BaseRestApiIntegrationTest {
         assertEquals(404, getResponse.statusCode());
         assertTrue(messageRepository.findByChannelId(channelId, PageRequest.of(0, 10)).isEmpty());
         assertTrue(channelKeyRepository.findByChannelIdAndVersion(channelId, channelKey.getVersion()).isEmpty());
-        assertTrue(messageReceiptRepository.findById(new MessageReceiptId(channelId, userId)).isEmpty());
+        assertTrue(channelMemberRepository.findById(new ChannelMemberId(channelId, userId)).isEmpty());
     }
 
     @Test
