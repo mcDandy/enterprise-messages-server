@@ -139,7 +139,7 @@ public class ChannelMembershipService {
      * @param adminUsername actor whose server role is checked
      */
     @Transactional
-    public void removeMemberFromChannel(Long channelId, Long targetUserId, String adminUsername) {
+    public void removeMemberFromChannelAndTriggerKeyRotation(Long channelId, Long targetUserId, String adminUsername) {
         Channel channel = channelRepository.findById(channelId).orElse(null);
         if (channel == null) {
             return;
@@ -157,6 +157,8 @@ public class ChannelMembershipService {
 
         channelMemberRepository.delete(member);
         channelMemberRepository.flush();
+
+        triggerKeyRotation(channelId);
     }
 
     /**
@@ -173,7 +175,7 @@ public class ChannelMembershipService {
                     .map(AppUser::getUsername)
                     .collect(Collectors.toSet());
 
-            if (!currentMembers.isEmpty()) {
+            if (currentMembers.size() > 1) {
                 keyRotationService.solicitateNewKeyRotation(channelId, currentMembers);
             }
         } catch (Exception e) {

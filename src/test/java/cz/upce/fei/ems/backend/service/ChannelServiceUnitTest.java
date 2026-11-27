@@ -32,9 +32,6 @@ class ChannelServiceUnitTest {
     private MessageServerService serverService;
     @Mock
     private ChannelDeletionService channelDeletionService;
-    @Mock
-    private KeyRotationService keyRotationService;
-
     @InjectMocks
     private ChannelService channelService;
 
@@ -75,7 +72,6 @@ class ChannelServiceUnitTest {
         assertNotNull(created);
         verify(channelRepository).save(any());
         verify(channelMemberRepository).save(any());
-        verify(keyRotationService).solicitateNewKeyRotation(any(), any());
     }
 
     @Test

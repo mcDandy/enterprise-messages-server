@@ -77,7 +77,7 @@ public class ChannelMembershipController {
             @PathVariable @PositiveId Long channelId,
             @PathVariable @PositiveId Long userId,
             Principal principal) {
-        channelMembershipService.removeMemberFromChannel(channelId, userId, principal.getName());
+        channelMembershipService.removeMemberFromChannelAndTriggerKeyRotation(channelId, userId, principal.getName());
         return ResponseEntity.noContent().build();
     }
 }

@@ -18,6 +18,7 @@ import tools.jackson.databind.JsonNode;
 
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -50,6 +51,8 @@ public class ChannelRestApiIntegrationTest extends BaseRestApiIntegrationTest {
         JsonNode channelNode = objectMapper.readTree(createResponse.body());
         Long channelId = channelNode.get("id").asLong();
         assertEquals("General Channel", channelNode.get("name").asText());
+        assertTrue(channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId).isEmpty(),
+                "A newly created one-member channel does not need a rotated key yet");
 
         HttpResponse<String> getResponse = get("/api/channels/" + channelId, token);
         assertEquals(200, getResponse.statusCode());
@@ -97,9 +100,11 @@ public class ChannelRestApiIntegrationTest extends BaseRestApiIntegrationTest {
         Long channelId = objectMapper.readTree(createResponse.body()).get("id").asLong();
 
         Long userId = userRepository.findByUsername("channel_delete").orElseThrow().getId();
-        // Channel creation already schedules rotation and creates an active key version.
-        ChannelKey channelKey = channelKeyRepository.findByChannelIdAndInvalidatedAtIsNull(channelId)
-                .orElseThrow();
+        // This test needs a key-backed message independently of membership-triggered rotation.
+        ChannelKey channelKey = new ChannelKey();
+        channelKey.setChannelId(channelId);
+        channelKey.setVersion(UUID.randomUUID());
+        channelKey = channelKeyRepository.saveAndFlush(channelKey);
 
         Message message = new Message();
         message.setChannelId(channelId);

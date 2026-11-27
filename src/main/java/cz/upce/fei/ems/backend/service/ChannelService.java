@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * Implements channel lookup, lifecycle, and channel-related authorization.
@@ -31,7 +30,6 @@ public class ChannelService {
     private final ServerMemberRepository serverMemberRepository;
     private final MessageServerService serverService;
     private final ChannelDeletionService channelDeletionService;
-    private final KeyRotationService keyRotationService;
     private final UserKeyRepository userKeyRepository;
     private final MessageServerRepository messageServerRepository;
 
@@ -88,8 +86,6 @@ public class ChannelService {
         member.setChannelId(savedChannel.getId());
         member.setUserId(creator.getId());
         channelMemberRepository.save(member);
-
-        keyRotationService.solicitateNewKeyRotation(savedChannel.getId(), Set.of(creatorUsername));
 
         return ChannelResponseDto.fromEntity(savedChannel);
     }

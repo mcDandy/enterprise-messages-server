@@ -56,6 +56,7 @@ class KeyRotationServiceUnitTest {
     @Test
     void testSolicitateNewKeyRotationOnline() throws Exception {
         when(sessionRegistry.getSession("user1")).thenReturn(session);
+        when(sessionRegistry.getSession("user2")).thenReturn(null);
         when(session.isOpen()).thenReturn(true);
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("username", "user1");
@@ -64,7 +65,7 @@ class KeyRotationServiceUnitTest {
                 .thenReturn(Optional.empty());
 
         when(appUserRepository.findByUsername("user1")).thenReturn(Optional.of(user(1L, "user1")));
-        keyRotationService.solicitateNewKeyRotation(10L, Set.of("user1"));
+        keyRotationService.solicitateNewKeyRotation(10L, Set.of("user1", "user2"));
 
         verify(channelKeyRepository).save(any(ChannelKey.class));
         verify(userQueue).enqueueForUser(eq(1L), any(byte[].class));
@@ -75,7 +76,7 @@ class KeyRotationServiceUnitTest {
     @Test
     void testSolicitateNewKeyRotationOffline() throws Exception {
         when(appUserRepository.findByUsername("user1")).thenReturn(Optional.of(user(1L, "user1")));
-        keyRotationService.solicitateNewKeyRotation(10L, Set.of("user1"));
+        keyRotationService.solicitateNewKeyRotation(10L, Set.of("user1", "user2"));
 
         verify(channelKeyRepository).save(any(ChannelKey.class));
         verify(userQueue).enqueueForUser(eq(1L), any(byte[].class));
@@ -99,6 +100,18 @@ class KeyRotationServiceUnitTest {
 
         verify(userQueue).enqueueForUser(eq(2L), any(byte[].class));
         verify(userQueue, never()).enqueueForUser(eq(1L), any(byte[].class));
+    }
+
+    @Test
+    void rotationRequestDoesNothingWhenRequesterIsTheOnlyChannelMember() {
+        ChannelMember onlyMember = new ChannelMember();
+        onlyMember.setUserId(1L);
+        when(channelMemberRepository.findByChannelId(10L)).thenReturn(List.of(onlyMember));
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(user(1L, "user1")));
+
+        keyRotationService.handleRotationRequest(10L, "user1");
+
+        verifyNoInteractions(userQueue, keyDeliveryService, channelKeyRepository);
     }
 
     @Test
