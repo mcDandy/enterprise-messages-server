@@ -2,6 +2,13 @@
 
 Spring Boot (Java 21), PostgreSQL 17 + PGMQ, Docker Compose, HTTPS/WSS.
 
+## Documentation
+
+- [Database and migrations](DATABASE_README.md)
+- [Docker development workflow](DEV_DOCKER.md)
+- [Android connection configuration](scripts/CLIENT_CONFIG.md)
+- [Development seed data](database/seeds/README.md)
+
 ## Start
 
 Install Docker with Compose. Copy `.env.example` to `.env` (`Copy-Item .env.example .env`
@@ -14,11 +21,37 @@ stack cannot start accidentally with shared placeholder credentials.
 docker compose up -d --build
 ```
 
-Starts PostgreSQL, creates a development TLS certificate on first run and
-starts the backend at `https://localhost:8443`. Logs:
+Starts PostgreSQL, creates a development TLS certificate on first run,
+exports the public Android connection configuration to `client-config/android/res/`
+and starts the backend at `https://localhost:8443`. Logs:
 `docker compose logs -f backend`.
 Swagger UI is at `https://localhost:8443/swagger-ui/index.html`; sign in with
 username `swagger` and the `SWAGGER_PASSWORD` value from `.env`.
+
+## Server operation
+
+From the repository root, using the same Compose project and environment file
+as during startup:
+
+```sh
+# Check service status (cert-init and client-config normally exit with code 0)
+docker compose ps -a
+
+# View backend logs (Ctrl+C stops following the logs, not the server)
+docker compose logs -f backend
+
+# Restart the backend without rebuilding it
+docker compose restart backend
+
+# Stop and remove the stack's containers and network
+docker compose down
+```
+
+`docker compose down` preserves the named PostgreSQL volume. After changing `.env` or rebuilding
+an image, use `docker compose up -d --build` instead of `restart` to apply the
+changes.
+
+## JavaDoc
 
 JavaDoc documents the code (classes and methods), rather than the REST API.
 Generate its browsable HTML pages from the repository root with:
@@ -28,6 +61,13 @@ Generate its browsable HTML pages from the repository root with:
 ```
 
 Open `build/docs/javadoc/index.html` in a browser.
+
+The normal Docker build (`bootJar`) also generates and packages JavaDoc.
+After starting the server, open `https://localhost:8443/javadoc/index.html`
+using the configured HTTPS host and port. Sign in with the same `swagger`
+username and `SWAGGER_PASSWORD` as for Swagger UI. This also protects nested
+pages and static assets. The hot-reload `bootRun` workflow does not serve the
+packaged JavaDoc; use the local HTML output when developing in that mode.
 
 ## Development mode: hot reload and demo data
 
@@ -145,6 +185,36 @@ first start**; changing it later does not regenerate an existing certificate.
 The self-signed `certificate.pem` must be trusted by Android. Use a trusted
 certificate outside development.
 
+By default the containers are named `ems-server`, `ems-db` and `cert-init`. Set
+`BACKEND_CONTAINER_NAME`, `DB_CONTAINER_NAME` and `CERT_INIT_CONTAINER_NAME`
+in `.env` to rename them.
+Docker container names must be unique across all Compose projects on the same
+host. The Compose project name can also be set using `COMPOSE_PROJECT_NAME`.
+Do not change the project name on an existing installation without accounting
+for its PostgreSQL volume.
+
+For independent installations on one host, use separate Compose project names,
+HTTPS ports, all three container names, certificate directories and credentials.
+For example, set `BACKEND_CONTAINER_NAME=company_a-ems-server`,
+`DB_CONTAINER_NAME=company_a-db`, `CERT_INIT_CONTAINER_NAME=company_a-cert-init`,
+`HTTPS_PORT=18443` and `TLS_CERTS_DIR=./certs/company_a` in `.env.company_a`.
+Use different values in `.env.company_b`:
+
+```sh
+docker compose -p company_a --env-file .env.company_a up -d --build
+docker compose -p company_b --env-file .env.company_b up -d --build
+```
+
+Each installation has its own PostgreSQL volume and Docker network.
+The generated Android resources use the same `client-config/` directory within
+a checkout; keep a separate copy of the output for each installation.
+The optional `compose.dev.yaml` provides a Gradle `bootRun` development setup.
+
+The Compose commands are cross-platform. On Linux with SELinux (e.g. Fedora),
+bind-mount permissions may require additional configuration.
+
+## Request and traffic limits
+
 HTTP request bodies are limited to 1 MiB by default. Set
 `API_MAX_REQUEST_BODY_BYTES` to change the limit when deploying the backend.
 Request URLs are limited to 4 KiB, request lines plus headers to 16 KiB, and
@@ -161,32 +231,6 @@ minutes. These limits can be adjusted with `API_MAX_CONCURRENT_REQUESTS`,
 `WS_MAX_CONCURRENT_MESSAGES` and `WS_MAX_CONNECTIONS`. Tomcat and the database
 pool also have fixed upper bounds to prevent unbounded thread or connection
 growth.
-
-By default the containers are named `ems-server`, `db` and `cert-init`. Set
-`BACKEND_CONTAINER_NAME`, `DB_CONTAINER_NAME` and `CERT_INIT_CONTAINER_NAME`
-in `.env` to rename them. Docker container names must be unique across all
-Compose projects on the same host. The Compose project name can also be set
-using `COMPOSE_PROJECT_NAME`.
-Do not change the project name on an existing installation without accounting
-for its PostgreSQL volume.
-
-For independent installations on one host, use separate Compose project names,
-HTTPS ports, all three container names, certificate directories and credentials.
-For example, set `BACKEND_CONTAINER_NAME=firma_a-ems-server`,
-`DB_CONTAINER_NAME=firma_a-db`, `CERT_INIT_CONTAINER_NAME=firma_a-cert-init`,
-`HTTPS_PORT=18443` and `TLS_CERTS_DIR=./certs/firma_a` in `.env.firma_a`.
-Use different values in `.env.firma_b`:
-
-```sh
-docker compose -p firma_a --env-file .env.firma_a up -d --build
-docker compose -p firma_b --env-file .env.firma_b up -d --build
-```
-
-Each installation has its own PostgreSQL volume and Docker network.
-The optional `compose.dev.yaml` provides a Gradle `bootRun` development setup.
-
-The Compose commands are cross-platform. On Linux with SELinux (e.g. Fedora),
-bind-mount permissions may require additional configuration.
 
 ## On-premise server address and TLS
 
@@ -222,6 +266,8 @@ JWT signing secret to multiple organizations.
 
 The server provides the address and TLS endpoint, but configuring the Android
 client's server URL and certificate trust is a separate client-side requirement.
+
+## Messaging API
 
 ### Message history REST API
 

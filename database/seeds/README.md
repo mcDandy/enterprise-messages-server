@@ -28,16 +28,25 @@ From the project root, with Docker Compose and a configured `.env`, use a separa
 ```powershell
 # PowerShell
 $env:TEST_DB_HOST_PORT = '55439'
-docker compose -p nnpro-seed --profile test up -d db-test
+docker compose -p nnpro-seed --profile test up -d --wait db-test
 Get-Content -Raw .\database\seeds\dev_seed.sql | docker compose -p nnpro-seed --profile test exec -T db-test psql -X -v ON_ERROR_STOP=1 -U nnpro -d nnpro_test
-docker compose -p nnpro-seed --profile test down
+docker compose -p nnpro-seed --profile test down --volumes
 Remove-Item Env:TEST_DB_HOST_PORT
 ```
 
-On Linux/macOS replace the PowerShell environment setting with `export TEST_DB_HOST_PORT=55439`, the pipe with:
+On Linux/macOS use:
 
 ```sh
+export TEST_DB_HOST_PORT=55439
+docker compose -p nnpro-seed --profile test up -d --wait db-test
 docker compose -p nnpro-seed --profile test exec -T db-test psql -X -v ON_ERROR_STOP=1 -U nnpro -d nnpro_test < database/seeds/dev_seed.sql
+docker compose -p nnpro-seed --profile test down --volumes
+unset TEST_DB_HOST_PORT
 ```
 
-The `db-test` service uses an ephemeral database (`tmpfs`), separate from the regular `db` service. The seed has no effect on automated tests run with another Compose project name.
+The `db-test` service uses a named `pgmq_test_data` volume, separate from the
+regular `db` service. The cleanup command removes the isolated `nnpro-seed`
+project's volumes, so use that project name only for disposable seed tests.
+Never run `down --volumes` on a project whose application database you want to
+keep. The seed has no effect on automated tests run with another Compose
+project name.
