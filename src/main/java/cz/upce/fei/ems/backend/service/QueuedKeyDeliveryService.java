@@ -30,7 +30,6 @@ public class QueuedKeyDeliveryService {
     private final PacketCodec packetCodec;
     private final PacketDispatcher dispatcher;
     private final ChannelMemberProgressService channelMemberProgressService;
-
     /**
      * Sends the current queue head without deleting it; a later client acknowledgement removes it.
      * A failed send leaves the packet available for retry.

@@ -3,7 +3,7 @@ package cz.upce.fei.ems.backend.service;
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.domain.Channel;
 import cz.upce.fei.ems.backend.domain.ChannelMember;
-import cz.upce.fei.ems.backend.domain.ChannelMemberId;
+import cz.upce.fei.ems.backend.dto.ChannelKeyEnvelopeDto;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.ChannelRepository;
@@ -15,9 +15,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Optional;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -61,22 +60,20 @@ class ChannelMembershipServiceUnitTest {
         when(channelRepository.findById(1L)).thenReturn(Optional.of(channel));
         when(serverService.isUserAdmin(10L, "admin")).thenReturn(true);
         when(appUserRepository.findById(2L)).thenReturn(Optional.of(target));
-        when(channelMemberRepository.existsByChannelIdAndUserId(1L, 2L)).thenReturn(false);
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 2L)).thenReturn(true);
         ChannelMember existingMember = new ChannelMember();
         existingMember.setUserId(1L);
-        ChannelMember addedMember = new ChannelMember();
-        addedMember.setUserId(2L);
-        when(channelMemberRepository.findByChannelId(1L)).thenReturn(List.of(existingMember, addedMember));
-        AppUser existingUser = new AppUser();
-        existingUser.setUsername("existing");
-        when(appUserRepository.findById(1L)).thenReturn(Optional.of(existingUser));
-        when(appUserRepository.findById(2L)).thenReturn(Optional.of(target));
+        when(channelMemberRepository.findByChannelId(1L)).thenReturn(List.of(existingMember));
+        AppUser admin = new AppUser();
+        admin.setId(99L);
+        admin.setUsername("admin");
+        when(appUserRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
 
-        channelMembershipService.addMemberAndTriggerKeyRotation(1L, 2L, "admin");
+        channelMembershipService.addMemberWithKeyEnvelopes(
+                1L, List.of(envelope(1L, "AQ=="), envelope(2L, "Ag==")), "admin");
 
         verify(channelMemberRepository).save(any());
-        verify(keyRotationService).solicitateNewKeyRotation(1L, Set.of("existing", "target"));
+        verify(keyRotationService).rotateAndDistributeKey(eq(1L), eq(99L), eq("admin"), anyMap());
     }
 
     @Test
@@ -84,7 +81,8 @@ class ChannelMembershipServiceUnitTest {
         when(channelRepository.findById(1L)).thenReturn(Optional.of(channel));
         when(serverService.isUserAdmin(10L, "user")).thenReturn(false);
 
-        assertThrows(SecurityException.class, () -> channelMembershipService.addMemberToChannel(1L, 2L, "user"));
+        assertThrows(SecurityException.class, () -> channelMembershipService.addMemberWithKeyEnvelopes(
+                1L, List.of(envelope(2L, "Ag==")), "user"));
     }
 
     @Test
@@ -92,15 +90,13 @@ class ChannelMembershipServiceUnitTest {
         when(channelRepository.findById(1L)).thenReturn(Optional.of(channel));
         when(serverService.isUserAdmin(10L, "admin")).thenReturn(true);
         ChannelMember member = new ChannelMember();
-        when(channelMemberRepository.findById(any(ChannelMemberId.class))).thenReturn(Optional.of(member));
-        ChannelMember remainingMember = new ChannelMember();
-        remainingMember.setUserId(3L);
-        when(channelMemberRepository.findByChannelId(1L)).thenReturn(List.of(remainingMember));
-        AppUser remainingUser = new AppUser();
-        remainingUser.setUsername("remaining");
-        when(appUserRepository.findById(3L)).thenReturn(Optional.of(remainingUser));
+        member.setUserId(2L);
+        ChannelMember remainingMembership = new ChannelMember();
+        remainingMembership.setUserId(3L);
+        when(channelMemberRepository.findByChannelId(1L)).thenReturn(List.of(member, remainingMembership));
 
-        channelMembershipService.removeMemberFromChannelAndTriggerKeyRotation(1L, 2L, "admin");
+        channelMembershipService.removeMemberWithKeyEnvelopes(
+                1L, 2L, List.of(envelope(3L, "Aw==")), "admin");
 
         verify(channelMemberRepository).delete(member);
         verifyNoInteractions(keyRotationService);
@@ -111,24 +107,47 @@ class ChannelMembershipServiceUnitTest {
         when(channelRepository.findById(1L)).thenReturn(Optional.of(channel));
         when(serverService.isUserAdmin(10L, "admin")).thenReturn(true);
         ChannelMember removedMember = new ChannelMember();
-        when(channelMemberRepository.findById(any(ChannelMemberId.class))).thenReturn(Optional.of(removedMember));
-
+        removedMember.setUserId(2L);
         ChannelMember remainingMember1 = new ChannelMember();
         remainingMember1.setUserId(3L);
         ChannelMember remainingMember2 = new ChannelMember();
         remainingMember2.setUserId(4L);
-        when(channelMemberRepository.findByChannelId(1L)).thenReturn(List.of(remainingMember1, remainingMember2));
+        when(channelMemberRepository.findByChannelId(1L))
+                .thenReturn(List.of(removedMember, remainingMember1, remainingMember2));
 
-        AppUser remainingUser1 = new AppUser();
-        remainingUser1.setUsername("remaining-1");
-        AppUser remainingUser2 = new AppUser();
-        remainingUser2.setUsername("remaining-2");
-        when(appUserRepository.findById(3L)).thenReturn(Optional.of(remainingUser1));
-        when(appUserRepository.findById(4L)).thenReturn(Optional.of(remainingUser2));
+        AppUser admin = new AppUser();
+        admin.setId(99L);
+        admin.setUsername("admin");
+        when(appUserRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
 
-        channelMembershipService.removeMemberFromChannelAndTriggerKeyRotation(1L, 2L, "admin");
+        channelMembershipService.removeMemberWithKeyEnvelopes(
+                1L, 2L, List.of(envelope(3L, "Aw=="), envelope(4L, "BA==")), "admin");
 
-        verify(keyRotationService).solicitateNewKeyRotation(1L, Set.of("remaining-1", "remaining-2"));
+        verify(keyRotationService).rotateAndDistributeKey(eq(1L), eq(99L), eq("admin"), anyMap());
+    }
+
+    @Test
+    void addMemberRejectsWrongRecipientIdsEvenWhenEnvelopeCountIsCorrect() {
+        when(channelRepository.findById(1L)).thenReturn(Optional.of(channel));
+        when(serverService.isUserAdmin(10L, "admin")).thenReturn(true);
+        ChannelMember currentMember = new ChannelMember();
+        currentMember.setUserId(1L);
+        when(channelMemberRepository.findByChannelId(1L)).thenReturn(List.of(currentMember));
+
+        assertThrows(IllegalArgumentException.class, () -> channelMembershipService.addMemberWithKeyEnvelopes(
+                1L, List.of(envelope(2L, "Ag=="), envelope(3L, "Aw==")), "admin"));
+
+        verify(channelMemberRepository, never()).save(any());
+        verifyNoInteractions(keyRotationService);
+    }
+
+    @Test
+    void rejectsNonBase64Ciphertext() {
+        when(channelRepository.findById(1L)).thenReturn(Optional.of(channel));
+        when(serverService.isUserAdmin(10L, "admin")).thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class, () -> channelMembershipService.addMemberWithKeyEnvelopes(
+                1L, List.of(envelope(1L, "not-base64!")), "admin"));
     }
 
     @Test
@@ -143,5 +162,12 @@ class ChannelMembershipServiceUnitTest {
         channelMembershipService.markAsRead(10L, 2L);
 
         verify(channelMemberProgressService).markAsRead(10L, 2L);
+    }
+
+    private static ChannelKeyEnvelopeDto envelope(Long userId, String ciphertext) {
+        ChannelKeyEnvelopeDto envelope = new ChannelKeyEnvelopeDto();
+        envelope.setUserId(userId);
+        envelope.setCiphertext(ciphertext);
+        return envelope;
     }
 }

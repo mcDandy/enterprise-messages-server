@@ -91,17 +91,17 @@ class PostgresUserQueueIntegrationTest {
     void mixesMultiplePacketTypesInTheSameUserQueueWithoutParsingThem() {
         long user = createTestQueue();
         byte[] chat = frame(PacketType.CHAT_MESSAGE_ENC.getCode(), new byte[]{1});
-        byte[] rotate = frame(PacketType.ROTATE_KEY.getCode(), new byte[]{2});
+        byte[] memberInfo = frame(PacketType.CHANNEL_MEMBER_INFO.getCode(), new byte[]{2});
         byte[] unicast = frame(PacketType.UNICAST_KEY_ROTATION.getCode(), new byte[]{3});
 
         queue.enqueueForUser(user, chat);
-        queue.enqueueForUser(user, rotate);
+        queue.enqueueForUser(user, memberInfo);
         queue.enqueueForUser(user, unicast);
         List<QueuedPacket> claimed = queue.claimForUser(user, 30, 10);
 
         assertEquals(3, claimed.size());
         assertArrayEquals(chat, claimed.get(0).frame());
-        assertArrayEquals(rotate, claimed.get(1).frame());
+        assertArrayEquals(memberInfo, claimed.get(1).frame());
         assertArrayEquals(unicast, claimed.get(2).frame());
         for (QueuedPacket packet : claimed) assertTrue(queue.acknowledgeForUser(user, packet.messageId()));
     }

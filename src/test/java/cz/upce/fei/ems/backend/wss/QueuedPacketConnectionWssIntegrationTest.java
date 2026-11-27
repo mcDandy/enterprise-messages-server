@@ -21,7 +21,7 @@ class QueuedPacketConnectionWssIntegrationTest extends BaseWssIntegrationTest {
         String username = "queued_connect_" + UUID.randomUUID().toString().replace("-", "");
         String token = loginAndGetToken(username, "Password123!");
         long userId = userRepository.findByUsername(username).orElseThrow().getId();
-        Packet first = new Packet(PacketType.ROTATE_KEY.getCode(), new byte[]{1, 2});
+        Packet first = new Packet(PacketType.CHANNEL_MEMBER_INFO.getCode(), new byte[]{1, 2});
         Packet second = new Packet(PacketType.UNICAST_KEY_ROTATION.getCode(), new byte[]{3, 4});
         userQueue.enqueueForUser(userId, encodeFrame(first));
         userQueue.enqueueForUser(userId, encodeFrame(second));

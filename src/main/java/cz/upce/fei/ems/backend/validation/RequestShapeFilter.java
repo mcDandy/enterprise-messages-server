@@ -5,6 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.NonNull;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -35,7 +36,11 @@ public class RequestShapeFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain chain
+    )
             throws ServletException, IOException {
         if (requestTargetBytes(request) > MAX_REQUEST_TARGET_BYTES) {
             reject(request, response, HttpStatus.URI_TOO_LONG, "Request URL is too long.");
@@ -102,7 +107,7 @@ public class RequestShapeFilter extends OncePerRequestFilter {
         }
         boolean bodyCapableMethod = Set.of("POST", "PUT", "PATCH").contains(method);
         if (!hasBody && !bodyCapableMethod) return true;
-        if (!Set.of("POST", "PUT", "PATCH").contains(method)) {
+        if (!bodyCapableMethod) {
             reject(request, response, HttpStatus.BAD_REQUEST, "This HTTP method does not accept a request body.");
             return false;
         }

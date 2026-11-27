@@ -101,9 +101,14 @@ class RequestValidationIntegrationTest extends BaseRestApiIntegrationTest {
         long channelId = objectMapper.readTree(channelResponse.body()).get("id").asLong();
         for (String userId : new String[]{"\"1\"", "{}", "10000000000000000000", "0", "1.5"}) {
             HttpResponse<String> invalidId = postWithHeaders("/api/channels/" + channelId + "/members",
-                    "{\"userId\":" + userId + "}", "application/json", null, token);
+                    "[{\"userId\":" + userId + ",\"ciphertext\":\"AQ==\"}]",
+                    "application/json", null, token);
             assertEquals(400, invalidId.statusCode(), "userId JSON value: " + userId + "; response=" + invalidId.body());
         }
+        HttpResponse<String> invalidCiphertext = postWithHeaders("/api/channels/" + channelId + "/members",
+                "[{\"userId\":1,\"ciphertext\":\"not-base64!\"}]",
+                "application/json", null, token);
+        assertJsonStatus(invalidCiphertext, 400);
 
         String invalidUsername = "{\"username\":\"bad\\u202Ename\",\"password\":\"Password123!\",\"publicKey\":\"key\"}";
         assertJsonStatus(postWithHeaders("/api/auth/register", invalidUsername, "application/json", null), 400);
