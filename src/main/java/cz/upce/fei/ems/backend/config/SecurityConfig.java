@@ -24,7 +24,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 /**
- * Configures stateless API security, JWT authentication, Swagger access, and JSON security errors.
+ * Configures stateless API security, JWT authentication, developer documentation access, and JSON security errors.
  */
 
 @Configuration
@@ -68,7 +68,7 @@ public class SecurityConfig {
                 };
 
         http
-                .securityMatcher("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
+                .securityMatcher("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/javadoc/**")
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
