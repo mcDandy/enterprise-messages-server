@@ -29,6 +29,13 @@ Generate its browsable HTML pages from the repository root with:
 
 Open `build/docs/javadoc/index.html` in a browser.
 
+The normal Docker build (`bootJar`) also generates and packages JavaDoc.
+After starting the server, open `https://localhost:8443/javadoc/index.html`
+using the configured HTTPS host and port. Sign in with the same `swagger`
+username and `SWAGGER_PASSWORD` as for Swagger UI. This also protects nested
+pages and static assets. The hot-reload `bootRun` workflow does not serve the
+packaged JavaDoc; use the local HTML output when developing in that mode.
+
 ## Development mode: hot reload and demo data
 
 Use the same `.env` as for normal Docker startup. To enable Java live reload
