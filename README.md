@@ -2,6 +2,13 @@
 
 Spring Boot (Java 21), PostgreSQL 17 + PGMQ, Docker Compose, HTTPS/WSS.
 
+## Documentation
+
+- [Database and migrations](DATABASE_README.md)
+- [Docker development workflow](DEV_DOCKER.md)
+- [Android connection configuration](scripts/CLIENT_CONFIG.md)
+- [Development seed data](database/seeds/README.md)
+
 ## Start
 
 Install Docker with Compose. Copy `.env.example` to `.env` (`Copy-Item .env.example .env`
@@ -14,11 +21,35 @@ stack cannot start accidentally with shared placeholder credentials.
 docker compose up -d --build
 ```
 
-Starts PostgreSQL, creates a development TLS certificate on first run and
-starts the backend at `https://localhost:8443`. Logs:
+Starts PostgreSQL, creates a development TLS certificate on first run,
+exports the public Android connection configuration to `client-config/android/res/`
+and starts the backend at `https://localhost:8443`. Logs:
 `docker compose logs -f backend`.
 Swagger UI is at `https://localhost:8443/swagger-ui/index.html`; sign in with
 username `swagger` and the `SWAGGER_PASSWORD` value from `.env`.
+
+## Server operation
+
+From the repository root, using the same Compose project and environment file
+as during startup:
+
+```sh
+# Check service status (cert-init and client-config normally exit with code 0)
+docker compose ps -a
+
+# View backend logs (Ctrl+C stops following the logs, not the server)
+docker compose logs -f backend
+
+# Restart the backend without rebuilding it
+docker compose restart backend
+
+# Stop and remove the stack's containers and network
+docker compose down
+```
+
+`docker compose down` preserves the named PostgreSQL volume. After changing `.env` or rebuilding
+an image, use `docker compose up -d --build` instead of `restart` to apply the
+changes.
 
 ## Development mode: hot reload and demo data
 
@@ -136,11 +167,11 @@ first start**; changing it later does not regenerate an existing certificate.
 The self-signed `certificate.pem` must be trusted by Android. Use a trusted
 certificate outside development.
 
-By default the containers are named `ems-server`, `db` and `cert-init`. Set
+By default the containers are named `ems-server`, `ems-db` and `cert-init`. Set
 `BACKEND_CONTAINER_NAME`, `DB_CONTAINER_NAME` and `CERT_INIT_CONTAINER_NAME`
-in `.env` to rename them. Docker container names must be unique across all
-Compose projects on the same host. The Compose project name can also be set
-using `COMPOSE_PROJECT_NAME`.
+in `.env` to rename them.
+Docker container names must be unique across all Compose projects on the same
+host. The Compose project name can also be set using `COMPOSE_PROJECT_NAME`.
 Do not change the project name on an existing installation without accounting
 for its PostgreSQL volume.
 
@@ -157,6 +188,8 @@ docker compose -p firma_b --env-file .env.firma_b up -d --build
 ```
 
 Each installation has its own PostgreSQL volume and Docker network.
+The generated Android resources use the same `client-config/` directory within
+a checkout; keep a separate copy of the output for each installation.
 The optional `compose.dev.yaml` provides a Gradle `bootRun` development setup.
 
 The Compose commands are cross-platform. On Linux with SELinux (e.g. Fedora),
