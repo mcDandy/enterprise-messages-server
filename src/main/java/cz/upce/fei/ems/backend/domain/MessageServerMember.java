@@ -8,6 +8,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SourceType;
 import java.time.OffsetDateTime;
 
+/**
+ * Persists a user role in a message server.
+ */
+
 @Entity
 @Table(name = "server_member")
 @Getter

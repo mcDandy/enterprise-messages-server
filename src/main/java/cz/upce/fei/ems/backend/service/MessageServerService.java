@@ -15,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Implements message-server lifecycle and server-level authorization.
+ */
+
 @Service
 @RequiredArgsConstructor
 public class MessageServerService {
@@ -25,6 +29,7 @@ public class MessageServerService {
     private final ChannelRepository channelRepository;
     private final ChannelDeletionService channelDeletionService;
 
+    /** @return servers in which the named user has a membership */
     public List<ServerResponseDto> getServersForUser(String username) {
         AppUser user = appUserRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -39,6 +44,13 @@ public class MessageServerService {
                 .toList();
     }
 
+    /**
+     * Creates a server and grants its creator the administrator role.
+     *
+     * @param request validated server properties
+     * @param username authenticated creator
+     * @return representation of the new server
+     */
     @Transactional
     public ServerResponseDto createServer(CreateServerRequestDto request, String username) {
         AppUser user = appUserRepository.findByUsername(username)
@@ -59,10 +71,17 @@ public class MessageServerService {
         return ServerResponseDto.fromEntity(savedServer);
     }
 
+    /** @return the requested server, or empty when it does not exist */
     public Optional<ServerResponseDto> getServer(Long serverId) {
         return serverRepository.findById(serverId).map(ServerResponseDto::fromEntity);
     }
 
+    /**
+     * Updates the server name after requiring administrator membership.
+     *
+     * @return updated server, or empty when it does not exist
+     * @throws SecurityException when the user is not a server administrator
+     */
     @Transactional
     public Optional<ServerResponseDto> updateServer(
             Long serverId, UpdateServerRequestDto request, String username) {
@@ -76,6 +95,7 @@ public class MessageServerService {
         return Optional.of(ServerResponseDto.fromEntity(serverRepository.save(server)));
     }
 
+    /** @return servers in which the authenticated user is a member */
     public List<ServerResponseDto> getMyServers(String username) {
         AppUser user = appUserRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -87,6 +107,12 @@ public class MessageServerService {
                 .toList();
     }
 
+    /**
+     * Deletes the server and its channels after checking administrator authority.
+     *
+     * @return {@code true} when a server was deleted; {@code false} when it was already absent
+     * @throws SecurityException when the user is not a server administrator
+     */
     @Transactional
     public boolean deleteServer(Long serverId, String username) {
         MessageServer server = serverRepository.findById(serverId).orElse(null);
@@ -101,6 +127,7 @@ public class MessageServerService {
         return true;
     }
 
+    /** @return whether the named account currently has the administrator role in the server */
     public boolean isUserAdmin(Long serverId, String username) {
         AppUser user = appUserRepository.findByUsername(username).orElse(null);
         if (user == null) return false;

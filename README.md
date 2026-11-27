@@ -51,6 +51,24 @@ docker compose down
 an image, use `docker compose up -d --build` instead of `restart` to apply the
 changes.
 
+## JavaDoc
+
+JavaDoc documents the code (classes and methods), rather than the REST API.
+Generate its browsable HTML pages from the repository root with:
+
+```powershell
+.\gradlew.bat javadoc
+```
+
+Open `build/docs/javadoc/index.html` in a browser.
+
+The normal Docker build (`bootJar`) also generates and packages JavaDoc.
+After starting the server, open `https://localhost:8443/javadoc/index.html`
+using the configured HTTPS host and port. Sign in with the same `swagger`
+username and `SWAGGER_PASSWORD` as for Swagger UI. This also protects nested
+pages and static assets. The hot-reload `bootRun` workflow does not serve the
+packaged JavaDoc; use the local HTML output when developing in that mode.
+
 ## Development mode: hot reload and demo data
 
 Use the same `.env` as for normal Docker startup. To enable Java live reload
@@ -177,14 +195,14 @@ for its PostgreSQL volume.
 
 For independent installations on one host, use separate Compose project names,
 HTTPS ports, all three container names, certificate directories and credentials.
-For example, set `BACKEND_CONTAINER_NAME=firma_a-ems-server`,
-`DB_CONTAINER_NAME=firma_a-db`, `CERT_INIT_CONTAINER_NAME=firma_a-cert-init`,
-`HTTPS_PORT=18443` and `TLS_CERTS_DIR=./certs/firma_a` in `.env.firma_a`.
-Use different values in `.env.firma_b`:
+For example, set `BACKEND_CONTAINER_NAME=company_a-ems-server`,
+`DB_CONTAINER_NAME=company_a-db`, `CERT_INIT_CONTAINER_NAME=company_a-cert-init`,
+`HTTPS_PORT=18443` and `TLS_CERTS_DIR=./certs/company_a` in `.env.company_a`.
+Use different values in `.env.company_b`:
 
 ```sh
-docker compose -p firma_a --env-file .env.firma_a up -d --build
-docker compose -p firma_b --env-file .env.firma_b up -d --build
+docker compose -p company_a --env-file .env.company_a up -d --build
+docker compose -p company_b --env-file .env.company_b up -d --build
 ```
 
 Each installation has its own PostgreSQL volume and Docker network.
@@ -194,6 +212,25 @@ The optional `compose.dev.yaml` provides a Gradle `bootRun` development setup.
 
 The Compose commands are cross-platform. On Linux with SELinux (e.g. Fedora),
 bind-mount permissions may require additional configuration.
+
+## Request and traffic limits
+
+HTTP request bodies are limited to 1 MiB by default. Set
+`API_MAX_REQUEST_BODY_BYTES` to change the limit when deploying the backend.
+Request URLs are limited to 4 KiB, request lines plus headers to 16 KiB, and
+requests to 100 headers and 100 parsed parameters. Requests with repeated query
+parameters or duplicate singleton/security headers are rejected. Bodies must
+use `application/json` (or an `application/*+json` type) encoded as UTF-8;
+compressed request bodies are rejected.
+Traffic protection allows a burst of up to 240 HTTP requests per client address
+and refills at 20 requests per second; the application also caps concurrent HTTP
+work at 128. WebSocket connections are capped at 2,000, with a 240-packet burst
+and 20 packets per second per client address. WebSocket packet processing is
+limited to 32 simultaneous operations, and idle connections close after 30
+minutes. These limits can be adjusted with `API_MAX_CONCURRENT_REQUESTS`,
+`WS_MAX_CONCURRENT_MESSAGES` and `WS_MAX_CONNECTIONS`. Tomcat and the database
+pool also have fixed upper bounds to prevent unbounded thread or connection
+growth.
 
 ## On-premise server address and TLS
 
@@ -229,6 +266,23 @@ JWT signing secret to multiple organizations.
 
 The server provides the address and TLS endpoint, but configuring the Android
 client's server URL and certificate trust is a separate client-side requirement.
+
+## Messaging API
+
+### Message history REST API
+
+`GET /api/channels/{channelId}/messages/recent` returns the latest 50 messages
+as a JSON array. For incremental history loading, use
+`GET /api/channels/{channelId}/messages?page=0&size=50`. `page` is zero-based
+(default `0`); `size` defaults to `50` and must be between `1` and `100`.
+Results are always ordered by message `id` descending, so the newest message
+comes first. Custom sorting is not supported. Invalid page or size values
+return HTTP `400`.
+
+The paginated endpoint returns a Spring Data `Slice`, not a `Page`: its JSON
+includes `content`, `number`, `size`, `numberOfElements`, `first`, and `last`
+(among other slice metadata), but does not calculate or include a total message
+count. Continue requesting pages while `last` is `false`.
 
 ### Chat message packet
 

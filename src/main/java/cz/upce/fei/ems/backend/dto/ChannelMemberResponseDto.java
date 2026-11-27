@@ -7,6 +7,10 @@ import lombok.Data;
 
 import java.time.OffsetDateTime;
 
+/**
+ * API representation of a channel member and that members message progress.
+ */
+
 @Data
 @Builder
 @Schema(description = "Detail člena kanálu")
@@ -21,11 +25,19 @@ public class ChannelMemberResponseDto {
     @Schema(example = "2026-10-22T20:00:00Z")
     private OffsetDateTime joinedAt;
 
+    @Schema(example = "123")
+    private Long lastDeliveredMessageId;
+
+    @Schema(example = "120")
+    private Long lastReadMessageId;
+
     public static ChannelMemberResponseDto fromEntity(ChannelMember member) {
         return ChannelMemberResponseDto.builder()
                 .channelId(member.getChannelId())
                 .userId(member.getUserId())
                 .joinedAt(member.getJoinedAt())
+                .lastDeliveredMessageId(member.getLastDeliveredMessageId())
+                .lastReadMessageId(member.getLastReadMessageId())
                 .build();
     }
 }

@@ -29,11 +29,11 @@ class ChannelMembershipServiceUnitTest {
     @Mock
     private ChannelMemberRepository channelMemberRepository;
     @Mock
+    private ChannelMemberProgressService channelMemberProgressService;
+    @Mock
     private AppUserRepository appUserRepository;
     @Mock
     private MessageServerService serverService;
-    @Mock
-    private KeyRotationService keyRotationService;
     @Mock
     private ServerMemberRepository serverMemberRepository;
 
@@ -83,5 +83,19 @@ class ChannelMembershipServiceUnitTest {
         channelMembershipService.removeMemberFromChannel(1L, 2L, "admin");
 
         verify(channelMemberRepository).delete(member);
+    }
+
+    @Test
+    void markAsReadAdvancesProgressForAuthenticatedMember() {
+        channelMembershipService.markAsRead(10L, 2L);
+
+        verify(channelMemberProgressService).markAsRead(10L, 2L);
+    }
+
+    @Test
+    void markAsReadRejectsNonMember() {
+        channelMembershipService.markAsRead(10L, 2L);
+
+        verify(channelMemberProgressService).markAsRead(10L, 2L);
     }
 }

@@ -8,6 +8,10 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Defines the OpenAPI metadata shown in the generated API documentation.
+ */
+
 @Configuration
 public class OpenApiConfig {
 
@@ -16,10 +20,7 @@ public class OpenApiConfig {
         final String securitySchemeName = "bearerAuth";
 
         return new OpenAPI()
-                .info(new Info()
-                        .title("CV Processing REST API")
-                        .version("1.0")
-                )
+                .info(new Info().title("Enterprise Messages REST API").version("1.0"))
                 .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
                 .components(new Components()
                         .addSecuritySchemes(securitySchemeName,

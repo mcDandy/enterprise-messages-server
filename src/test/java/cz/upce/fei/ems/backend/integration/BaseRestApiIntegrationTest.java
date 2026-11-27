@@ -119,4 +119,17 @@ public abstract class BaseRestApiIntegrationTest {
 
         return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
+
+    protected void assertJsonAction(HttpResponse<String> response) throws Exception {
+        org.junit.jupiter.api.Assertions.assertEquals(200, response.statusCode(), response.body());
+        org.junit.jupiter.api.Assertions.assertTrue(response.headers()
+                .firstValue("Content-Type").orElse("").startsWith("application/json"), response.body());
+        org.junit.jupiter.api.Assertions.assertTrue(objectMapper.readTree(response.body())
+                .get("success").asBoolean(), response.body());
+    }
+
+    protected void assertNoContent(HttpResponse<String> response) {
+        org.junit.jupiter.api.Assertions.assertEquals(204, response.statusCode());
+        org.junit.jupiter.api.Assertions.assertTrue(response.body().isEmpty(), response.body());
+    }
 }

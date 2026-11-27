@@ -13,6 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
+/**
+ * Implements profile updates and user public-key management.
+ */
+
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -20,6 +24,7 @@ public class UserService {
     private final AppUserRepository appUserRepository;
     private final UserKeyRepository userKeyRepository;
 
+    /** Updates the profile display name for an existing account. */
     @Transactional
     public void updateDisplayName(String username, String displayName) {
         AppUser user = appUserRepository.findByUsername(username)
@@ -28,6 +33,9 @@ public class UserService {
         appUserRepository.save(user);
     }
 
+    /**
+     * Revokes the existing active public key and stores the supplied replacement in one transaction.
+     */
     @Transactional
     public void rotatePublicKey(String username, String newPublicKey) {
         AppUser user = appUserRepository.findByUsername(username)
@@ -46,14 +54,17 @@ public class UserService {
         userKeyRepository.save(key);
     }
 
+    /** @return the user’s active public key, or empty when none is currently registered */
     public Optional<UserKey> getActivePublicKeyForUser(Long userId) {
         return userKeyRepository.findByUserIdAndRevokedAtIsNull(userId);
     }
 
+    /** Maps a present user to its public API representation. */
     public Optional<UserResponseDto> getUserResponse(AppUser user) {
         return Optional.ofNullable(user).map(UserResponseDto::fromEntity);
     }
 
+    /** Maps the active public key to its API representation when one exists. */
     public Optional<UserKeyResponseDto> getActivePublicKeyResponse(Long userId) {
         return getActivePublicKeyForUser(userId).map(UserKeyResponseDto::fromEntity);
     }

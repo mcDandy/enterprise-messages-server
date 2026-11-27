@@ -9,8 +9,11 @@ import cz.upce.fei.ems.backend.net.protocol.PacketType;
 import cz.upce.fei.ems.backend.net.session.SessionRegistry;
 import cz.upce.fei.ems.backend.queue.PostgresUserQueue;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
+import cz.upce.fei.ems.backend.repository.ChannelRepository;
 import cz.upce.fei.ems.backend.repository.ChannelMemberRepository;
 import cz.upce.fei.ems.backend.repository.MessageRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.socket.WebSocketSession;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -37,6 +40,8 @@ class MessageServiceUnitTest {
     private MessageRepository messageRepository;
     @Mock
     private AppUserRepository appUserRepository;
+    @Mock
+    private ChannelRepository channelRepository;
     @Mock
     private ChannelMemberRepository channelMemberRepository;
     @Mock
@@ -75,6 +80,11 @@ class MessageServiceUnitTest {
         recipient.setId(2L);
         recipient.setUsername("recipient");
         when(appUserRepository.findByUsername("sender")).thenReturn(Optional.of(sender));
+        when(messageRepository.saveAndFlush(any(Message.class))).thenAnswer(invocation -> {
+            Message saved = invocation.getArgument(0);
+            saved.setId(55L);
+            return saved;
+        });
         when(channelMemberRepository.findByChannelId(10L))
                 .thenReturn(List.of(senderMembership, recipientMembership));
         when(appUserRepository.findAllById(Set.of(2L))).thenReturn(List.of(recipient));
@@ -92,8 +102,8 @@ class MessageServiceUnitTest {
         ArgumentCaptor<byte[]> queuedFrame = ArgumentCaptor.forClass(byte[].class);
         InOrder saveBeforeQueue = inOrder(messageRepository, userQueue);
         saveBeforeQueue.verify(messageRepository).saveAndFlush(any(Message.class));
-        saveBeforeQueue.verify(userQueue).enqueueForUser(eq(2L), queuedFrame.capture());
-        verify(userQueue, never()).enqueueForUser(eq(sender.getId()), any(byte[].class));
+        saveBeforeQueue.verify(userQueue).enqueueMessageForUser(eq(2L), eq(55L), queuedFrame.capture());
+        verify(userQueue, never()).enqueueMessageForUser(eq(sender.getId()), anyLong(), any(byte[].class));
         verify(queuedPacketDeliveryService).sendNextQueuedPacket(2L, "recipient", recipientSession);
         Packet decoded = packetCodec.decode(java.nio.ByteBuffer.wrap(queuedFrame.getValue()));
         assertEquals(packet.getType(), decoded.getType());
@@ -119,5 +129,42 @@ class MessageServiceUnitTest {
         assertThrows(IllegalArgumentException.class, () ->
                 messageService.processAndQueueMessage("unknown", 10L, 100L, new byte[0],
                         new Packet(PacketType.CHAT_MESSAGE_ENC.getCode(), new byte[0])));
+    }
+
+    @Test
+    void getRecentMessagesRejectsMissingChannel() {
+        when(channelRepository.existsById(999L)).thenReturn(false);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> messageService.getRecentMessages(999L));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        verify(messageRepository, never()).findTop50ByChannelIdOrderBySentAtDescIdDesc(999L);
+    }
+
+    @Test
+    void getMessagesPageRejectsMissingChannel() {
+        when(channelRepository.existsById(999L)).thenReturn(false);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> messageService.getMessagesPage(999L, 0, 50));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        verify(messageRepository, never()).findByChannelId(eq(999L), any());
+    }
+
+    @Test
+    void getMessagesPageRejectsInvalidPageAndSize() {
+        ResponseStatusException negativePage = assertThrows(ResponseStatusException.class,
+                () -> messageService.getMessagesPage(999L, -1, 50));
+        ResponseStatusException zeroSize = assertThrows(ResponseStatusException.class,
+                () -> messageService.getMessagesPage(999L, 0, 0));
+        ResponseStatusException excessiveSize = assertThrows(ResponseStatusException.class,
+                () -> messageService.getMessagesPage(999L, 0, 101));
+
+        assertEquals(HttpStatus.BAD_REQUEST, negativePage.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, zeroSize.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, excessiveSize.getStatusCode());
+        verifyNoInteractions(channelRepository, messageRepository);
     }
 }

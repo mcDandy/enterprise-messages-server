@@ -1,9 +1,11 @@
 package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.dto.AddMemberRequestDto;
+import cz.upce.fei.ems.backend.dto.ActionResponseDto;
 import cz.upce.fei.ems.backend.dto.ServerMemberResponseDto;
 import cz.upce.fei.ems.backend.dto.UpdateMemberRoleRequestDto;
 import cz.upce.fei.ems.backend.service.ServerMembershipService;
+import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,6 +18,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
+
+/**
+ * Exposes listing and management of members and roles within a server.
+ */
 
 @RestController
 @RequestMapping("/api/servers/{serverId}/members")
@@ -33,7 +39,7 @@ public class ServerMembershipController {
             }
     )
     @GetMapping
-    public ResponseEntity<List<ServerMemberResponseDto>> getMembers(@PathVariable Long serverId) {
+    public ResponseEntity<List<ServerMemberResponseDto>> getMembers(@PathVariable @PositiveId Long serverId) {
         return ResponseEntity.ok(membershipService.getServerMembers(serverId));
     }
 
@@ -46,13 +52,13 @@ public class ServerMembershipController {
             }
     )
     @PostMapping
-    public ResponseEntity<Void> addMember(
-            @PathVariable Long serverId,
+    public ResponseEntity<ActionResponseDto> addMember(
+            @PathVariable @PositiveId Long serverId,
             @Valid @RequestBody AddMemberRequestDto request,
             Principal principal) {
 
         membershipService.addMemberToServer(serverId, request.getUserId(), request.getRole(), principal.getName());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ActionResponseDto.completed());
     }
 
     @Operation(
@@ -65,8 +71,8 @@ public class ServerMembershipController {
     )
     @DeleteMapping("/{userId}")
     public ResponseEntity<Void> removeMember(
-            @PathVariable Long serverId,
-            @PathVariable Long userId,
+            @PathVariable @PositiveId Long serverId,
+            @PathVariable @PositiveId Long userId,
             Principal principal) {
         membershipService.removeMemberFromServer(serverId, userId, principal.getName());
         return ResponseEntity.noContent().build();
@@ -82,13 +88,13 @@ public class ServerMembershipController {
             }
     )
     @PutMapping("/{userId}/role")
-    public ResponseEntity<Void> updateMemberRole(
-            @PathVariable Long serverId,
-            @PathVariable Long userId,
+    public ResponseEntity<ActionResponseDto> updateMemberRole(
+            @PathVariable @PositiveId Long serverId,
+            @PathVariable @PositiveId Long userId,
             @Valid @RequestBody UpdateMemberRoleRequestDto request,
             Principal principal) {
 
         membershipService.updateMemberRole(serverId, userId, request.getRole(), principal.getName());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ActionResponseDto.completed());
     }
 }

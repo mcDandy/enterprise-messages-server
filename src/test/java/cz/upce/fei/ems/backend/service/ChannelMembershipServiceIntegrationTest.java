@@ -13,10 +13,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @Transactional
-class MessageReceiptServiceIntegrationTest {
+class ChannelMembershipServiceIntegrationTest {
 
     @Autowired
-    private MessageReceiptService receiptService;
+    private ChannelMembershipService channelMembershipService;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -64,14 +64,14 @@ class MessageReceiptServiceIntegrationTest {
         Long m3 = insertMessage(channelId, senderId, keyId);
 
         // Confirm the newest delivered message.
-        receiptService.markAsDelivered(m3, readerName);
+        channelMembershipService.markAsDelivered(m3, readerId);
 
         // Read an older message.
-        receiptService.markAsRead(m2, readerName);
+        channelMembershipService.markAsRead(m2, readerId);
 
         // Late receipts must not move progress backwards.
-        receiptService.markAsRead(m1, readerName);
-        receiptService.markAsDelivered(m1, readerName);
+        channelMembershipService.markAsRead(m1, readerId);
+        channelMembershipService.markAsDelivered(m1, readerId);
 
         assertEquals(m3, getProgress(channelId, readerId,
                 "last_delivered_message_id"));
@@ -79,7 +79,7 @@ class MessageReceiptServiceIntegrationTest {
                 "last_read_message_id"));
 
         // Reading m3 also means it has been delivered.
-        receiptService.markAsRead(m3, readerName);
+        channelMembershipService.markAsRead(m3, readerId);
 
         assertEquals(m3, getProgress(channelId, readerId,
                 "last_read_message_id"));
@@ -96,7 +96,7 @@ class MessageReceiptServiceIntegrationTest {
 
         // Someone outside the channel cannot confirm its messages.
         assertThrows(SecurityException.class,
-                () -> receiptService.markAsRead(m3, outsiderName));
+                () -> channelMembershipService.markAsRead(m3, outsiderId));
 
         Long outsiderCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM message_channel_member WHERE user_id = ?",

@@ -8,6 +8,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 
+/**
+ * Database queries for channel memberships and their progress fields.
+ */
+
 public interface ChannelMemberRepository extends JpaRepository<ChannelMember, ChannelMemberId> {
     List<ChannelMember> findByUserId(Long userId);
     List<ChannelMember> findByChannelId(Long channelId);

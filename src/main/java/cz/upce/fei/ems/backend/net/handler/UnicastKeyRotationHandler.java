@@ -4,6 +4,7 @@ import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.net.protocol.Packet;
 import cz.upce.fei.ems.backend.net.protocol.PacketDispatcher;
 import cz.upce.fei.ems.backend.net.protocol.PacketType;
+import cz.upce.fei.ems.backend.net.protocol.PacketValidation;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.service.KeyRotationService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.nio.ByteBuffer;
+
+/**
+ * Handles a direct key-rotation packet for a single user.
+ */
 
 @Slf4j
 @Component
@@ -29,7 +34,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
 
     @Override
     public void handle(WebSocketSession session, Packet packet) throws Exception {
-        log.info("Handling UNICAST_KEY_ROTATION packet for session ID: {}", session.getId());
+        log.debug("Handling UNICAST_KEY_ROTATION packet for session ID: {}", session.getId());
 
         byte[] payload = packet.getPayload();
         if (!isValidPayload(session, payload)) {
@@ -50,7 +55,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
     }
 
     private void delegateRotation(AuthenticatedSender sender, UnicastRotationRequest request) {
-        log.info(
+        log.debug(
                 "Delegating client unicast rotation: sender '{}' (ID: {}) -> recipient ID {} in channel {}",
                 sender.username(),
                 sender.user().getId(),
@@ -67,12 +72,20 @@ public class UnicastKeyRotationHandler implements PacketHandler {
     }
 
     private boolean isValidPayload(WebSocketSession session, byte[] payload) throws Exception {
-        if (payload == null || payload.length < 9) {
+        if (payload == null || payload.length < 2 * Long.BYTES + 1
+                || payload.length > PacketValidation.MAX_PAYLOAD_BYTES) {
             log.warn("Invalid unicast rotation payload length: {}", payload != null ? payload.length : 0);
             dispatcher.sendError(session, "Invalid unicast rotation payload.");
             return false;
         }
-        log.info("Payload received successfully, size: {} bytes", payload.length);
+        ByteBuffer header = ByteBuffer.wrap(payload);
+        long recipientUserId = header.getLong();
+        long channelId = header.getLong();
+        if (recipientUserId <= 0 || channelId <= 0) {
+            dispatcher.sendError(session, "Recipient and channel IDs must be positive.");
+            return false;
+        }
+        log.debug("Payload received successfully, size: {} bytes", payload.length);
         return true;
     }
 
@@ -94,7 +107,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
             dispatcher.sendError(session, "Unauthorized connection.");
             return null;
         }
-        log.info("Authenticated sender resolved: {} (ID: {})", username, sender.getId());
+        log.debug("Authenticated sender resolved: {} (ID: {})", username, sender.getId());
         return new AuthenticatedSender(username, sender);
     }
 
@@ -104,7 +117,7 @@ public class UnicastKeyRotationHandler implements PacketHandler {
         long channelId = buffer.getLong();
         byte[] ciphertext = new byte[buffer.remaining()];
         buffer.get(ciphertext);
-        log.info(
+        log.debug(
                 "Buffer parsed -> recipientUserId: {}, ciphertext length: {} bytes",
                 recipientUserId,
                 ciphertext.length

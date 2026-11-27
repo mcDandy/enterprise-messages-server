@@ -52,8 +52,8 @@ public class ChannelMembershipRestApiIntegrationTest extends BaseRestApiIntegrat
 
         // Remove member
         HttpResponse<String> removeResp = delete("/api/channels/" + channelId + "/members/" + userId, adminToken);
-        assertEquals(204, removeResp.statusCode());
-        assertEquals(204, delete("/api/channels/" + channelId + "/members/" + userId, adminToken).statusCode());
+        assertNoContent(removeResp);
+        assertNoContent(delete("/api/channels/" + channelId + "/members/" + userId, adminToken));
 
         // Check members again
         HttpResponse<String> getResp2 = get("/api/channels/" + channelId + "/members", adminToken);
@@ -86,6 +86,6 @@ public class ChannelMembershipRestApiIntegrationTest extends BaseRestApiIntegrat
         HttpResponse<String> response = delete(
                 "/api/channels/" + channelId + "/members/999999", adminToken);
 
-        assertEquals(204, response.statusCode());
+        assertNoContent(response);
     }
 }

@@ -8,6 +8,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
+/**
+ * Handles channel-key rotation requests from a channel member.
+ */
+
 @Component
 @RequiredArgsConstructor
 public class KeyRotationHandler implements PacketHandler {
@@ -29,6 +33,11 @@ public class KeyRotationHandler implements PacketHandler {
 
         if (!(session.getAttributes().get("currentChannelId") instanceof Long channelId)) {
             dispatcher.sendError(session, "User is not in an active channel.");
+            return;
+        }
+
+        if (packet.getPayload() != null && packet.getPayload().length != 0) {
+            dispatcher.sendError(session, "Invalid key rotation request payload.");
             return;
         }
 

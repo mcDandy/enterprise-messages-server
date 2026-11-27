@@ -13,6 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Implements server membership changes and role authorization.
+ */
+
 @Service
 @RequiredArgsConstructor
 public class ServerMembershipService {
@@ -22,12 +26,21 @@ public class ServerMembershipService {
     private final MessageServerRepository messageServerRepository;
     private final MessageServerService serverService;
 
+    /** @return member representations for the server, or an empty list when there are no members */
     public List<ServerMemberResponseDto> getServerMembers(Long serverId) {
         return serverMemberRepository.findByServerId(serverId).stream()
                 .map(ServerMemberResponseDto::fromEntity)
                 .toList();
     }
 
+    /**
+     * Adds an existing account to a server after checking administrator authority.
+     * A missing role defaults to {@link MessageServerRole#MEMBER}.
+     *
+     * @throws SecurityException when the actor is not an administrator
+     * @throws IllegalArgumentException when the target account does not exist
+     * @throws IllegalStateException when the target is already a member
+     */
     @Transactional
     public void addMemberToServer(Long serverId, Long targetUserId, MessageServerRole role, String adminUsername) {
         if (!serverService.isUserAdmin(serverId, adminUsername)) {
@@ -50,6 +63,11 @@ public class ServerMembershipService {
         serverMemberRepository.save(member);
     }
 
+    /**
+     * Removes an existing member after checking administrator authority; missing rows are a no-op.
+     *
+     * @throws SecurityException when the actor is not an administrator
+     */
     @Transactional
     public void removeMemberFromServer(Long serverId, Long targetUserId, String adminUsername) {
         if (!messageServerRepository.existsById(serverId)) {
@@ -69,6 +87,12 @@ public class ServerMembershipService {
         serverMemberRepository.delete(member);
     }
 
+    /**
+     * Changes a member role after checking administrator authority.
+     *
+     * @throws SecurityException when the actor is not an administrator
+     * @throws IllegalArgumentException when the target has no membership in the server
+     */
     @Transactional
     public void updateMemberRole(Long serverId, Long targetUserId, MessageServerRole newRole, String adminUsername) {
         if (!isUserAdmin(serverId, adminUsername)) {
@@ -82,6 +106,7 @@ public class ServerMembershipService {
         serverMemberRepository.save(member);
     }
 
+    /** @return whether the named user has administrator membership in the given server */
     public boolean isUserAdmin(Long serverId, String username) {
         AppUser user = appUserRepository.findByUsername(username).orElse(null);
         if (user == null) {

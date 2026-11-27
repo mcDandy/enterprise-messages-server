@@ -5,6 +5,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 
+/**
+ * Authentication response containing the credentials issued after login or registration.
+ */
+
 @Data
 @Builder
 @AllArgsConstructor

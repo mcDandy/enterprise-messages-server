@@ -62,3 +62,22 @@ tasks.named('test') {
 	useJUnitPlatform()
 	environment 'SWAGGER_PASSWORD', 'test-swagger-password'
 }
+
+tasks.withType(Javadoc).configureEach {
+	options.addBooleanOption('Xdoclint:-missing', true)
+}
+
+// Include the generated JavaDoc in the deployable application and test classpath.
+def javadocPages = tasks.named('javadoc', Javadoc)
+
+tasks.named('bootJar') {
+	from(javadocPages) {
+		into 'BOOT-INF/classes/static/javadoc'
+	}
+}
+
+tasks.named('processTestResources') {
+	from(javadocPages) {
+		into 'static/javadoc'
+	}
+}

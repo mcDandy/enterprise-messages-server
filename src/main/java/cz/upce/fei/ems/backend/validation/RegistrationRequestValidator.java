@@ -6,6 +6,10 @@ import jakarta.validation.ConstraintValidatorContext;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
+/**
+ * Validates registration fields against configured account-name and password rules.
+ */
+
 @Component
 public class RegistrationRequestValidator implements ConstraintValidator<ValidRegistrationRequest, RegisterRequestDto> {
     private final int usernameMinLength;

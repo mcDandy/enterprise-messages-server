@@ -1,6 +1,7 @@
 package cz.upce.fei.ems.backend.config;
 
 import cz.upce.fei.ems.backend.domain.AppUser;
+import cz.upce.fei.ems.backend.exception.ApiErrorWriter;
 import cz.upce.fei.ems.backend.repository.AppUserRepository;
 import cz.upce.fei.ems.backend.service.JwtService;
 import jakarta.servlet.FilterChain;
@@ -15,10 +16,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+
+/**
+ * Authenticates bearer-token requests before they reach protected REST endpoints.
+ */
 
 @Slf4j
 @Component
@@ -28,6 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
     private final AppUserRepository appUserRepository;
+    private final ApiErrorWriter errorWriter;
 
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
@@ -55,7 +62,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         } catch (Exception e) {
             log.warn("JWT authentication failed: {}", e.getMessage());
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired JWT token.");
+            errorWriter.write(request, response, HttpStatus.UNAUTHORIZED, "Invalid or expired JWT token.");
             return;
         }
 
@@ -68,7 +75,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return null;
         }
         if (authHeader.length() < 8) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Token is too short.");
+            errorWriter.write(request, response, HttpStatus.BAD_REQUEST, "Bearer token is empty.");
             return null;
         }
         return authHeader.substring(7);
@@ -78,13 +85,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt, HttpServletRequest request, HttpServletResponse response
     ) throws Exception {
         String username = jwtService.extractUsername(jwt);
-        if (username == null || SecurityContextHolder.getContext().getAuthentication() != null) {
+        if (username == null) {
+            errorWriter.write(request, response, HttpStatus.UNAUTHORIZED, "Invalid or expired JWT token.");
+            return false;
+        }
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
             return true;
         }
 
         AppUser appUser = appUserRepository.findByUsername(username).orElse(null);
         if (appUser != null && appUser.isBanned()) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Your account has been globally banned.");
+            errorWriter.write(request, response, HttpStatus.UNAUTHORIZED, "Your account has been globally banned.");
             return false;
         }
 

@@ -20,6 +20,10 @@ import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Coordinates channel-key rotation and queues key packets for channel members.
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,6 +36,14 @@ public class KeyRotationService {
     private final PacketCodec packetCodec;
     private final QueuedKeyDeliveryService keyDeliveryService;
 
+    /**
+     * Creates and queues a new key-rotation request for one online member, or a stable offline
+     * member when nobody is connected. The packet is persisted before any online delivery attempt.
+     *
+     * @param channelId channel whose key version is rotated
+     * @param currentChannelMembers usernames eligible to receive the rotation request
+     * @throws IllegalStateException if the new rotation cannot be scheduled
+     */
     @Transactional
     public void solicitateNewKeyRotation(Long channelId, Set<String> currentChannelMembers) {
         doSolicitateNewKeyRotation(channelId, currentChannelMembers);
@@ -51,8 +63,10 @@ public class KeyRotationService {
 
             UUID version = createNextChannelKey(channelId);
             Packet packet = createRotationPacket(channelId, version);
-            userQueue.enqueueForUser(recipient.getId(), encodeFrame(packet));
-            log.info("Queued key rotation for channel {} to user {} (requestId: {})",
+            byte[] frame = encodeFrame(packet);
+            long queueMessageId = userQueue.enqueueForUser(recipient.getId(), frame);
+            logQueuedPacket(recipient.getId(), queueMessageId, frame);
+            log.debug("Queued key rotation for channel {} to user {} (requestId: {})",
                     channelId, recipient.getId(), version);
             if (online != null && online.isOpen()) {
                 dispatchAfterCommit(() -> {
@@ -99,9 +113,15 @@ public class KeyRotationService {
         return new Packet(PacketType.ROTATE_KEY.getCode(), buffer.array());
     }
 
+    /**
+     * Starts key rotation for all channel members except the requester.
+     *
+     * @param channelId channel in which rotation was requested
+     * @param senderUsername member who requested rotation
+     */
     @Transactional
     public void handleRotationRequest(Long channelId, String senderUsername) {
-        log.info("Received rotation request from user {} for channel {}", senderUsername, channelId);
+        log.debug("Received rotation request from user {} for channel {}", senderUsername, channelId);
 
         Set<String> otherMembers = findChannelMemberUsernames(channelId).stream()
                 .filter(username -> !username.equals(senderUsername))
@@ -111,6 +131,18 @@ public class KeyRotationService {
         }
     }
 
+    /**
+     * Validates a client-provided encrypted key for two channel members, then durably queues it
+     * for the recipient before attempting delivery.
+     *
+     * @param channelId channel whose active key version the ciphertext belongs to
+     * @param senderUserId authenticated sender account ID
+     * @param senderUsername sender name for diagnostics
+     * @param recipientUserId target account ID
+     * @param ciphertext encrypted channel-key bytes supplied by the sender
+     * @throws SecurityException if either account is not a member of the channel
+     * @throws IllegalStateException if queueing or dispatch setup fails
+     */
     @Transactional
     public void handleClientUnicastRotation(
             Long channelId, Long senderUserId, String senderUsername, Long recipientUserId, byte[] ciphertext
@@ -140,7 +172,7 @@ public class KeyRotationService {
     }
 
     private void logUnicastRotationRequest(Long channelId, String senderUsername, Long recipientUserId) {
-        log.info(
+        log.debug(
                 "Handling client unicast rotation for channel {} from user {} to recipient ID {}",
                 channelId,
                 senderUsername,
@@ -156,7 +188,7 @@ public class KeyRotationService {
             log.error("Channel key does not exists");
             return Optional.empty();
         }
-        log.info(
+        log.debug(
                 "User {} distributed new channel key version {} for channel {} (ciphertext size: {} bytes)",
                 senderUsername,
                 channelKey,
@@ -183,7 +215,9 @@ public class KeyRotationService {
         Packet packet = createUnicastRotationPacket(senderUserId, channelKey, ciphertext);
         // Persist the complete encoded packet *before* dispatching it, whether
         // the recipient is online or offline. Queue insert uses the same DB txn.
-        userQueue.enqueueForUser(recipientUserId, encodeFrame(packet));
+        byte[] frame = encodeFrame(packet);
+        long queueMessageId = userQueue.enqueueForUser(recipientUserId, frame);
+        logQueuedPacket(recipientUserId, queueMessageId, frame);
         WebSocketSession session = sessionRegistry.getSession(recipient.getUsername());
         if (session != null && session.isOpen()) {
             Runnable dispatch = () -> {
@@ -196,7 +230,7 @@ public class KeyRotationService {
             };
             dispatchAfterCommit(dispatch);
         } else {
-            log.info("Recipient user ID {} is offline; complete key packet queued for channel {}.",
+            log.debug("Recipient user ID {} is offline; complete key packet queued for channel {}.",
                     recipientUserId, channelId);
         }
     }
@@ -210,6 +244,17 @@ public class KeyRotationService {
         return new Packet(PacketType.UNICAST_KEY_ROTATION.getCode(), payload.array());
     }
 
+    private void logQueuedPacket(long recipientUserId, long queueMessageId, byte[] frame) {
+            log.debug("Key packet entered user queue: userId={}, messageId={}, frameLength={} bytes, frame(hex)={}",
+                    recipientUserId, queueMessageId, frame.length, HexFormat.of().formatHex(frame));
+    }
+
+    /**
+     * Attempts to send the queue head after a user reconnects; the packet remains queued until ACK.
+     *
+     * @param username reconnecting account name
+     * @param session authenticated WebSocket session
+     */
     @Transactional
     public void processPendingOnConnect(String username, WebSocketSession session) {
         AppUser user = appUserRepository.findByUsername(username).orElse(null);

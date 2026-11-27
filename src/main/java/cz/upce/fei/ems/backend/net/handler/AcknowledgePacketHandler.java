@@ -10,6 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
+/**
+ * Handles client acknowledgements and advances delivery of the users queued packets.
+ */
+
 @Component
 @RequiredArgsConstructor
 public class AcknowledgePacketHandler implements PacketHandler {

@@ -3,7 +3,12 @@ package cz.upce.fei.ems.backend.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import cz.upce.fei.ems.backend.validation.constraints.NoControlCharacters;
 import lombok.Data;
+
+/**
+ * Validated request body for changing the authenticated users display name.
+ */
 
 @Data
 @Schema(description = "Změna zobrazovaného jména")
@@ -12,5 +17,6 @@ public class UpdateDisplayNameRequestDto {
     @NotBlank(message = "Display name must not be blank")
     @Size(max = 100, message = "Display name cannot exceed 100 characters")
     @Schema(example = "Honza Novák")
+    @NoControlCharacters
     private String displayName;
 }

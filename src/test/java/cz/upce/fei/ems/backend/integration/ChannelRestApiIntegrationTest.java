@@ -115,8 +115,8 @@ public class ChannelRestApiIntegrationTest extends BaseRestApiIntegrationTest {
         channelMemberRepository.saveAndFlush(member);
 
         HttpResponse<String> deleteResponse = delete("/api/channels/" + channelId, token);
-        assertEquals(204, deleteResponse.statusCode());
-        assertEquals(204, delete("/api/channels/" + channelId, token).statusCode());
+        assertNoContent(deleteResponse);
+        assertNoContent(delete("/api/channels/" + channelId, token));
 
         HttpResponse<String> getResponse = get("/api/channels/" + channelId, token);
         assertEquals(404, getResponse.statusCode());
@@ -131,6 +131,6 @@ public class ChannelRestApiIntegrationTest extends BaseRestApiIntegrationTest {
 
         HttpResponse<String> response = delete("/api/channels/999999", token);
 
-        assertEquals(204, response.statusCode());
+        assertNoContent(response);
     }
 }

@@ -1,9 +1,11 @@
 package cz.upce.fei.ems.backend.controller;
 
 import cz.upce.fei.ems.backend.dto.CreateServerRequestDto;
+import cz.upce.fei.ems.backend.dto.ActionResponseDto;
 import cz.upce.fei.ems.backend.dto.ServerResponseDto;
 import cz.upce.fei.ems.backend.dto.UpdateServerRequestDto;
 import cz.upce.fei.ems.backend.service.MessageServerService;
+import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -14,9 +16,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Principal;
 import java.util.List;
+
+/**
+ * Exposes message-server listing and CRUD endpoints for the authenticated user.
+ */
 
 @RestController
 @RequestMapping("/api/servers")
@@ -66,10 +73,10 @@ public class MessageServerController {
             }
     )
     @GetMapping("/{id}")
-    public ResponseEntity<ServerResponseDto> getServer(@PathVariable Long id) {
+    public ResponseEntity<ServerResponseDto> getServer(@PathVariable @PositiveId Long id) {
         return serverService.getServer(id)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Server not found."));
     }
 
     @Operation(
@@ -84,12 +91,12 @@ public class MessageServerController {
     )
     @PutMapping("/{id}")
     public ResponseEntity<ServerResponseDto> updateServer(
-            @PathVariable Long id,
+            @PathVariable @PositiveId Long id,
             @Valid @RequestBody UpdateServerRequestDto request,
             Principal principal) {
         return serverService.updateServer(id, request, principal.getName())
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Server not found."));
     }
 
     @Operation(
@@ -102,7 +109,7 @@ public class MessageServerController {
             }
     )
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteServer(@PathVariable Long id, Principal principal) {
+    public ResponseEntity<Void> deleteServer(@PathVariable @PositiveId Long id, Principal principal) {
         serverService.deleteServer(id, principal.getName());
         return ResponseEntity.noContent().build();
     }

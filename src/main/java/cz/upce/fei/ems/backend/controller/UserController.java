@@ -3,6 +3,7 @@ package cz.upce.fei.ems.backend.controller;
 import cz.upce.fei.ems.backend.domain.AppUser;
 import cz.upce.fei.ems.backend.dto.*;
 import cz.upce.fei.ems.backend.service.UserService;
+import cz.upce.fei.ems.backend.validation.constraints.PositiveId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -11,8 +12,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
+
+/**
+ * Exposes the authenticated user profile and public-key operations.
+ */
 
 @RestController
 @RequestMapping("/api/users")
@@ -34,7 +41,7 @@ public class UserController {
     public ResponseEntity<UserResponseDto> getCurrentUser(@AuthenticationPrincipal AppUser user) {
         return userService.getUserResponse(user)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
     }
 
     @Operation(
@@ -45,10 +52,10 @@ public class UserController {
             }
     )
     @PutMapping("/me/display-name")
-    public ResponseEntity<Void> updateDisplayName(
+    public ResponseEntity<ActionResponseDto> updateDisplayName(
             @Valid @RequestBody UpdateDisplayNameRequestDto request, @AuthenticationPrincipal AppUser user) {
         userService.updateDisplayName(user.getUsername(), request.getDisplayName());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ActionResponseDto.completed());
     }
 
     @Operation(
@@ -59,11 +66,11 @@ public class UserController {
             }
     )
     @PostMapping("/me/keys")
-    public ResponseEntity<Void> rotatePublicKey(
+    public ResponseEntity<ActionResponseDto> rotatePublicKey(
             @Valid @RequestBody RotatePublicKeyRequestDto request, @AuthenticationPrincipal AppUser user
     ) {
         userService.rotatePublicKey(user.getUsername(), request.getPublicKey());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ActionResponseDto.completed());
     }
 
     @Operation(
@@ -76,9 +83,9 @@ public class UserController {
             }
     )
     @GetMapping("/{userId}/key")
-    public ResponseEntity<UserKeyResponseDto> getUserPublicKey(@PathVariable Long userId) {
+    public ResponseEntity<UserKeyResponseDto> getUserPublicKey(@PathVariable @PositiveId Long userId) {
         return userService.getActivePublicKeyResponse(userId)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Public key not found."));
     }
 }

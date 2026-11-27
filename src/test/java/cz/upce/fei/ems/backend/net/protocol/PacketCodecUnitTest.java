@@ -48,4 +48,11 @@ class PacketCodecUnitTest {
         assertEquals(type, decoded.getType());
         assertEquals(0, decoded.getPayload().length);
     }
+
+    @Test
+    void rejectsEmptyAndOversizedFrames() {
+        assertThrows(IllegalArgumentException.class, () -> codec.decode(ByteBuffer.allocate(0)));
+        assertThrows(IllegalArgumentException.class,
+                () -> codec.decode(ByteBuffer.allocate(PacketValidation.MAX_PAYLOAD_BYTES + 2)));
+    }
 }
